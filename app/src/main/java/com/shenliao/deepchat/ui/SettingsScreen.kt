@@ -314,6 +314,33 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
             item {
                 SectionCard(
+                    title = "联网搜索",
+                    subtitle = "由 DeepSeek 服务端执行搜索与抓取，按成功请求计费；只在官方接口 + deepseek-flash 下生效",
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("允许模型联网", fontSize = 14.sp, color = AppColors.TextMain)
+                            Text(
+                                if (s.webSearch) "模型自己决定要不要搜，回答会带引用来源" else "只用训练数据回答",
+                                fontSize = 11.sp,
+                                color = AppColors.TextFaint,
+                            )
+                        }
+                        Switch(
+                            checked = s.webSearch,
+                            onCheckedChange = { vm.updateSettings(vm.settings.copy(webSearch = it)) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = AppColors.Primary,
+                                uncheckedTrackColor = AppColors.SurfaceHigh,
+                            ),
+                        )
+                    }
+                }
+            }
+
+            item {
+                SectionCard(
                     title = "文件解析",
                     subtitle = "PDF / Word / PPT 会上传解析（按页计费）；txt、md、csv、xlsx 免费",
                 ) {

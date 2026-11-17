@@ -61,6 +61,14 @@ object ChatApi {
         return c.newCall(request)
     }
 
+    /** 联网工具只在官方接口 + deepseek-flash 下可用 */
+    fun wantsWeb(settings: Settings): Boolean {
+        if (!settings.webSearch) return false
+        if (settings.preset != Settings.PRESET_DEEPSEEK) return false
+        val model = settings.model.trim().lowercase()
+        return model == "deepseek-flash" || model == "deepseek-v4-flash"
+    }
+
     /** 构造请求体。history 里不应包含正在生成的占位消息。 */
     fun buildBody(settings: Settings, history: List<Message>, stream: Boolean): JSONObject {
         val messages = JSONArray()
@@ -98,6 +106,11 @@ object ChatApi {
             val obj = JSONObject().put("role", m.role)
             if (atts.isEmpty()) {
                 obj.put("content", text)
+                if (m.role == "assistant" && m.serverToolCalls.isNotBlank()) {
+                    runCatching { JSONArray(m.serverToolCalls) }.getOrNull()?.let {
+                        obj.put("server_tool_calls", it)
+                    }
+                }
                 messages.put(obj)
                 continue
             }
@@ -170,6 +183,15 @@ object ChatApi {
         if (stream && settings.preset == Settings.PRESET_DEEPSEEK) {
             body.put("stream_options", JSONObject().put("include_usage", true))
         }
+        if (wantsWeb(settings)) {
+            // 服务端工具：模型自己决定搜不搜，客户端不执行任何工具
+            body.put(
+                "tools",
+                JSONArray()
+                    .put(JSONObject().put("type", "deepseek_web_search").put("name", "deepseek_web_search"))
+                    .put(JSONObject().put("type", "deepseek_read_url").put("name", "deepseek_read_url")),
+            )
+        }
         return body
     }
 
@@ -181,7 +203,16 @@ object ChatApi {
         onContent: (String) -> Unit,
         onReasoning: (String) -> Unit,
         onUsage: (Int, Int) -> Unit,
+        onToolCalls: (String) -> Unit = {},
     ) {
+        val toolCalls = JSONArray()
+
+        fun collect(src: JSONArray?) {
+            if (src == null || src.length() == 0) return
+            for (i in 0 until src.length()) toolCalls.put(src.opt(i))
+            onToolCalls(toolCalls.toString())
+        }
+
         call.execute().use { resp ->
             if (!resp.isSuccessful) {
                 throw ApiException(resp.code, readableError(resp.body?.string().orEmpty()))
@@ -201,7 +232,13 @@ object ChatApi {
                 }
                 val choices = chunk.optJSONArray("choices") ?: continue
                 if (choices.length() == 0) continue
-                val delta = choices.optJSONObject(0)?.optJSONObject("delta") ?: continue
+                val choice = choices.optJSONObject(0) ?: continue
+
+                // 联网工具：服务端调用记录，多轮要原样回传
+                collect(choice.optJSONArray("server_tool_calls"))
+                val delta = choice.optJSONObject("delta") ?: continue
+                collect(delta.optJSONArray("server_tool_calls"))
+
                 val reasoning = delta.optString("reasoning_content", "")
                 if (reasoning.isNotEmpty() && reasoning != "null") onReasoning(reasoning)
                 val content = delta.optString("content", "")

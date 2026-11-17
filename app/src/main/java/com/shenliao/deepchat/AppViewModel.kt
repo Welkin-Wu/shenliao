@@ -262,6 +262,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val reasoning = StringBuilder()
         var inTok = 0
         var outTok = 0
+        var toolCalls = ""
         var lastFlush = 0L
 
         fun flush(force: Boolean) {
@@ -270,8 +271,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             lastFlush = now
             val c = content.toString()
             val r = reasoning.toString()
+            val tc = toolCalls
             patchMessage(convId, assistantId) {
-                it.copy(text = c, reasoning = r, inputTokens = inTok, outputTokens = outTok)
+                it.copy(text = c, reasoning = r, inputTokens = inTok, outputTokens = outTok, serverToolCalls = tc)
             }
         }
 
@@ -283,6 +285,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     onContent = { deltas.trySend(Delta(content = it)) },
                     onReasoning = { deltas.trySend(Delta(reason = it)) },
                     onUsage = { i, o -> deltas.trySend(Delta(inTok = i, outTok = o)) },
+                    onToolCalls = { toolCalls = it },
                 )
             } catch (t: Throwable) {
                 deltas.trySend(Delta(error = describe(t)))
@@ -314,10 +317,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     error = if (content.isBlank()) error else null,
                     inputTokens = inTok,
                     outputTokens = outTok,
+                    serverToolCalls = toolCalls,
                 )
             }
         } else if (content.isBlank() && reasoning.isBlank() && !stopped) {
-            patchMessage(convId, assistantId) { it.copy(error = "模型没有返回任何内容，可以点重试") }
+            patchMessage(convId, assistantId) {
+                it.copy(error = "模型没有返回任何内容，可以点重试", serverToolCalls = toolCalls)
+            }
         }
     }
 
@@ -357,7 +363,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun describe(t: Throwable): String = when (t) {
         is ApiException -> when (t.status) {
-            400 -> "请求被拒绝（400）：${t.detail}"
+            400 -> if (t.detail.contains("tool", ignoreCase = true)) {
+                "当前接口不支持联网工具，把「联网」关掉再试（400）：${t.detail}"
+            } else {
+                "请求被拒绝（400）：${t.detail}"
+            }
             401 -> "API Key 无效或未授权（401）"
             402 -> "账户余额不足（402）"
             403 -> "没有权限访问该模型（403）"

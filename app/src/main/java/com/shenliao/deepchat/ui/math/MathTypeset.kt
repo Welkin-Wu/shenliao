@@ -131,31 +131,27 @@ class MathTypesetter(
         val sup = node.sup?.let { layoutAt(it, scriptSize) }
         val sub = node.sub?.let { layoutAt(it, scriptSize) }
 
-        // 右侧脚本的宽度
-        val rightWidth = max(sup?.width ?: 0f, sub?.width ?: 0f)
         val gap = baseSize * 0.04f
+        val rightWidth = max(sup?.width ?: 0f, sub?.width ?: 0f)
         val width = base.width + gap + rightWidth
 
-        val supRaise = max(baseSize * 0.38f, base.ascent * 0.42f)
-        val subDrop = baseSize * 0.22f
+        val supRaise = max(baseSize * 0.40f, base.ascent * 0.42f)
+        val subDrop = baseSize * 0.20f
 
-        var ascent = base.ascent
-        var descent = base.descent
+        // 关键：ascent 必须覆盖到上标顶部，且所有子盒都按这个 ascent 重新对基线
+        val ascent = max(base.ascent, sup?.let { supRaise + it.ascent } ?: 0f)
+        val descent = max(base.descent, sub?.let { subDrop + it.descent } ?: 0f)
+        val baseline = ascent
+
         val ops = mutableListOf<MOp>()
-        ops.addAll(base.ops.shift(0f, 0f))
-
+        ops.addAll(base.ops.shift(0f, baseline - base.ascent))
         sup?.let {
-            // sup 的基线在 base 基线之上 supRaise
-            val topY = base.ascent - supRaise - it.ascent
-            ops.addAll(it.ops.shift(base.width + gap, topY))
-            ascent = max(ascent, supRaise + it.height)
+            ops.addAll(it.ops.shift(base.width + gap, baseline - supRaise - it.ascent))
         }
         sub?.let {
-            val topY = base.ascent + subDrop - it.ascent
-            ops.addAll(it.ops.shift(base.width + gap, topY))
-            descent = max(descent, it.height - subDrop)
+            ops.addAll(it.ops.shift(base.width + gap, baseline + subDrop - it.ascent))
         }
-        return MathBox(width, ascent, descent.coerceAtLeast(base.descent), ops)
+        return MathBox(width, ascent, descent, ops)
     }
 
     private fun layoutFrac(node: MNode.Frac): MathBox {
@@ -252,24 +248,22 @@ class MathTypesetter(
             }
             MathBox(width, ascent, descent, ops)
         } else {
-            // 右侧上下标
+            // 右侧上下标（同样要重新对基线）
             val baseW = opBox.width
             val rightW = max(sup?.width ?: 0f, sub?.width ?: 0f)
             val gap = baseSize * 0.03f
-            var ascent = opBox.ascent
-            var descent = opBox.descent
+            val supRaise = max(baseSize * 0.42f, opBox.ascent * 0.4f)
+            val subDrop = baseSize * 0.20f
+            val ascent = max(opBox.ascent, sup?.let { supRaise + it.ascent } ?: 0f)
+            val descent = max(opBox.descent, sub?.let { subDrop + it.descent } ?: 0f)
+            val baseline = ascent
             val ops = mutableListOf<MOp>()
-            ops.addAll(opBox.ops.shift(0f, 0f))
-            val baseline = opBox.ascent
+            ops.addAll(opBox.ops.shift(0f, baseline - opBox.ascent))
             sup?.let {
-                val y = baseline - max(baseSize * 0.42f, opBox.ascent * 0.4f) - it.ascent
-                ops.addAll(it.ops.shift(baseW + gap, y))
-                ascent = max(ascent, baseline - y)
+                ops.addAll(it.ops.shift(baseW + gap, baseline - supRaise - it.ascent))
             }
             sub?.let {
-                val y = baseline + baseSize * 0.2f
-                ops.addAll(it.ops.shift(baseW + gap, y))
-                descent = max(descent, y + it.height - baseline)
+                ops.addAll(it.ops.shift(baseW + gap, baseline + subDrop - it.ascent))
             }
             MathBox(baseW + gap + rightW, ascent, descent, ops)
         }

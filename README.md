@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Size](https://img.shields.io/badge/APK-11%20MB-informational)
 
-- 包名 `com.shenliao.deepchat` · 当前版本 **1.1**
+- 包名 `com.shenliao.deepchat` · 当前版本 **1.3**
 - 最低 Android 8.0（API 26），编译目标 API 35
 - 纯 Kotlin + Jetpack Compose，无 WebView、无第三方 SDK、无统计埋点
 
@@ -27,15 +27,27 @@
 
 LaTeX 排版引擎离线渲染的样张（就是 App 里实际用的那套代码）：
 
-| 分式 / 根号 | 求和上下限 | 大括号与偏导 |
+| 上标基线对齐 | 上下标混排 | 分式 / 根号 |
 | --- | --- | --- |
-| ![](dist/math-preview/math_0.png) | ![](dist/math-preview/math_2.png) | ![](dist/math-preview/math_5.png) |
+| ![](dist/math-preview/math_0.png) | ![](dist/math-preview/math_2.png) | ![](dist/math-preview/math_4.png) |
+
+| 求和上下限 | 大括号与偏导 |
+| --- | --- |
+| ![](dist/math-preview/math_3.png) | ![](dist/math-preview/math_8.png) |
+
+## 最近更新
+
+- **1.3** 修掉公式基线错位：上标盒子把「向上伸出的高度」算进 ascent 却没重新对齐基线，导致 `x²` 里的 `x` 被顶高
+- **1.2** 增加联网搜索：声明服务端工具 `deepseek_web_search` / `deepseek_read_url`，搜索与抓取都在服务端执行，客户端不跑任何工具；思考开启时走多步「深度思考搜索」
+
+完整记录见 [CHANGELOG](CHANGELOG.md)。
 
 ## 功能
 
 | 能力 | 说明 |
 | --- | --- |
 | 流式对话 | SSE 逐字出字，随时可停、可复制、可重试 |
+| 联网搜索 | 服务端工具 `deepseek_web_search`，模型自己决定搜不搜，回答带引用来源；贴 URL 自动阅读 |
 | 看图 | 相册多选（最多 6 张）或直接拍照；自动压到长边 1400px、纠正 EXIF 旋转 |
 | 读文档 | PDF / Word / PPT / Excel / EPUB / txt / md / csv，上传即解析，随消息引用 |
 | 思考模式 | 开关 + 推理强度（低/高/最高），`reasoning_content` 实时流出来，可折叠 |

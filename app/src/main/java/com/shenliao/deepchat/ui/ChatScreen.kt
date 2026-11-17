@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.shenliao.deepchat.AppViewModel
+import com.shenliao.deepchat.net.ChatApi
 import java.io.File
 
 private val DOC_MIME_TYPES = arrayOf(
@@ -219,6 +220,18 @@ fun ChatScreen(
                 thinking = vm.settings.thinking,
                 onToggleThinking = {
                     vm.updateSettings(vm.settings.copy(thinking = !vm.settings.thinking))
+                },
+                webSearch = vm.settings.webSearch,
+                onToggleWeb = {
+                    val next = !vm.settings.webSearch
+                    vm.updateSettings(vm.settings.copy(webSearch = next))
+                    if (next && !ChatApi.wantsWeb(vm.settings.copy(webSearch = true))) {
+                        Toast.makeText(
+                            context,
+                            "联网需要「DeepSeek 官方」接口 + deepseek-flash 模型",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 },
                 canSend = (draft.isNotBlank() || vm.pending.isNotEmpty()) && !attachmentsBusy,
                 onSend = { doSend() },

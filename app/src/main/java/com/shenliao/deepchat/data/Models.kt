@@ -67,6 +67,8 @@ data class Message(
     val error: String? = null,
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
+    /** 联网工具的服务端调用记录，多轮要原样回传（DeepSeek 扩展字段） */
+    val serverToolCalls: String = "",
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     val isUser: Boolean get() = role == "user"
@@ -82,6 +84,7 @@ data class Message(
         error?.let { put("error", it) }
         if (inputTokens > 0) put("inTok", inputTokens)
         if (outputTokens > 0) put("outTok", outputTokens)
+        if (serverToolCalls.isNotEmpty()) put("toolCalls", serverToolCalls)
         put("ts", createdAt)
     }
 
@@ -97,6 +100,7 @@ data class Message(
             error = if (o.has("error")) o.optString("error") else null,
             inputTokens = o.optInt("inTok", 0),
             outputTokens = o.optInt("outTok", 0),
+            serverToolCalls = o.optString("toolCalls", ""),
             createdAt = o.optLong("ts", System.currentTimeMillis()),
         )
     }
@@ -143,6 +147,8 @@ data class Settings(
     val maxTokens: Int = 0,
     /** 文档解析方式：text = 只取文字；rich = 文字 + 图表 */
     val docMode: String = DOC_MODE_TEXT,
+    /** 联网搜索（服务端工具 deepseek_web_search） */
+    val webSearch: Boolean = true,
 ) {
     val ready: Boolean get() = apiKey.isNotBlank() && baseUrl.isNotBlank() && model.isNotBlank()
 

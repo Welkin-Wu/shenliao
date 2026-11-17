@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -69,6 +70,8 @@ fun Composer(
     streaming: Boolean,
     thinking: Boolean,
     onToggleThinking: () -> Unit,
+    webSearch: Boolean,
+    onToggleWeb: () -> Unit,
     canSend: Boolean,
     onSend: () -> Unit,
     onStop: () -> Unit,
@@ -201,6 +204,13 @@ fun Composer(
                 onClick = onToggleThinking,
                 icon = Icons.Outlined.AutoAwesome,
                 label = if (thinking) "思考中" else "直接回答",
+            )
+            Spacer(Modifier.width(8.dp))
+            SmallChip(
+                selected = webSearch,
+                onClick = onToggleWeb,
+                icon = Icons.Outlined.Public,
+                label = if (webSearch) "联网" else "离线",
             )
             Spacer(Modifier.width(8.dp))
             SmallChip(

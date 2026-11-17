@@ -18,6 +18,7 @@ class Prefs(ctx: Context) {
         temperature = sp.getFloat("temperature", 0.7f),
         maxTokens = sp.getInt("maxTokens", 0),
         docMode = sp.getString("docMode", Settings.DOC_MODE_TEXT) ?: Settings.DOC_MODE_TEXT,
+        webSearch = sp.getBoolean("webSearch", true),
     )
 
     fun save(s: Settings) {
@@ -32,6 +33,7 @@ class Prefs(ctx: Context) {
             putFloat("temperature", s.temperature)
             putInt("maxTokens", s.maxTokens)
             putString("docMode", s.docMode)
+            putBoolean("webSearch", s.webSearch)
         }
     }
 }
