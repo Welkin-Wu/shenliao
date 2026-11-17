@@ -382,8 +382,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         // 引用兜底：① 正文里的链接 → ② 用模型真实用过的搜索词再搜一次
         var finalCitations = citations
+        var citSource = if (citations.isNotBlank()) "api" else ""
         if (finalCitations.isBlank()) {
-            finalCitations = extractCitations(content.toString())
+            val fromText = extractCitations(content.toString())
+            if (fromText.isNotBlank()) {
+                finalCitations = fromText
+                citSource = "text"
+            }
         }
         if (finalCitations.isBlank() && !stopped && content.isNotBlank() && ChatApi.wantsWeb(settings)) {
             val queries = parseSearchQueries(toolCalls)
@@ -392,7 +397,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val remote = withContext(Dispatchers.IO) {
                     runCatching { ChatApi.search(settings, query, 6) }.getOrDefault("")
                 }
-                if (remote.isNotBlank() && remote != "[]") finalCitations = remote
+                if (remote.isNotBlank() && remote != "[]") {
+                    finalCitations = remote
+                    citSource = "search"
+                }
             }
         }
 
@@ -406,6 +414,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     outputTokens = outTok,
                     serverToolCalls = toolCalls,
                     citations = finalCitations,
+                    citationsSource = citSource,
                 )
             }
         } else if (content.isBlank() && reasoning.isBlank() && !stopped) {
@@ -414,10 +423,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     error = "模型没有返回任何内容，可以点重试",
                     serverToolCalls = toolCalls,
                     citations = finalCitations,
+                    citationsSource = citSource,
                 )
             }
         } else if (finalCitations != citations) {
-            patchReply(convId, assistantId, replyIndex) { it.copy(citations = finalCitations) }
+            patchReply(convId, assistantId, replyIndex) {
+                it.copy(citations = finalCitations, citationsSource = citSource)
+            }
         }
     }
 

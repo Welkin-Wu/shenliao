@@ -101,7 +101,7 @@ fun MessageRow(
         }
 
         if (reply.citations.isNotBlank()) {
-            CitationBlock(reply.citations)
+            CitationBlock(reply.citations, reply.citationsSource)
         }
 
         if (reply.error != null) {
@@ -354,13 +354,21 @@ fun ThinkingBlock(text: String, streaming: Boolean) {
 }
 
 @Composable
-fun CitationBlock(citationsJson: String) {
+fun CitationBlock(citationsJson: String, source: String = "") {
     val items = remember(citationsJson) { parseCitations(citationsJson) }
     if (items.isEmpty()) return
 
     var expanded by remember { mutableStateOf(false) }
     var openedIndex by remember { mutableStateOf(-1) }
     val uriHandler = LocalUriHandler.current
+
+    // 老实标注出处：补搜出来的结果只是"相关链接"，不是模型真正引用的来源
+    val label = when (source) {
+        "api" -> "${items.size} 个来源"
+        "text" -> "${items.size} 个来源 · 正文链接"
+        "search" -> "${items.size} 个来源 · 补搜"
+        else -> "${items.size} 个来源"
+    }
 
     Column(
         modifier = Modifier
@@ -389,7 +397,7 @@ fun CitationBlock(citationsJson: String) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "${items.size} 个来源",
+                text = label,
                 fontSize = 12.sp,
                 color = AppColors.TextDim,
             )
@@ -403,6 +411,15 @@ fun CitationBlock(citationsJson: String) {
         }
 
         if (expanded) {
+            if (source == "search") {
+                Text(
+                    text = "接口没有下发引用，这些是客户端用同一句话补搜到的相关网页，不代表模型实际引用过。",
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = AppColors.TextFaint,
+                    modifier = Modifier.padding(start = 20.dp, end = 4.dp, bottom = 4.dp),
+                )
+            }
             items.forEachIndexed { index, item ->
                 val isOpen = openedIndex == index
                 Column(

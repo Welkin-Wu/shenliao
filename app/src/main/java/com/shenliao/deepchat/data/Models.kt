@@ -64,6 +64,8 @@ data class Reply(
     val reasoning: String = "",
     /** 联网来源引用（JSON 数组：[{url,title}]） */
     val citations: String = "",
+    /** 来源出处：api = 接口返回；text = 正文里的链接；search = 客户端补搜（仅供参考） */
+    val citationsSource: String = "",
     /** 联网工具的服务端调用记录，多轮要原样回传 */
     val serverToolCalls: String = "",
     val inputTokens: Int = 0,
@@ -75,6 +77,7 @@ data class Reply(
         put("text", text)
         if (reasoning.isNotEmpty()) put("reasoning", reasoning)
         if (citations.isNotEmpty()) put("cites", citations)
+        if (citationsSource.isNotEmpty()) put("citeSrc", citationsSource)
         if (serverToolCalls.isNotEmpty()) put("toolCalls", serverToolCalls)
         if (inputTokens > 0) put("inTok", inputTokens)
         if (outputTokens > 0) put("outTok", outputTokens)
@@ -87,6 +90,7 @@ data class Reply(
             text = o.optString("text", ""),
             reasoning = o.optString("reasoning", ""),
             citations = o.optString("cites", ""),
+            citationsSource = o.optString("citeSrc", ""),
             serverToolCalls = o.optString("toolCalls", ""),
             inputTokens = o.optInt("inTok", 0),
             outputTokens = o.optInt("outTok", 0),
@@ -158,6 +162,7 @@ data class Message(
                             text = legacyText,
                             reasoning = legacyReasoning,
                             citations = o.optString("cites", ""),
+            citationsSource = o.optString("citeSrc", ""),
                             serverToolCalls = o.optString("toolCalls", ""),
                             inputTokens = o.optInt("inTok", 0),
                             outputTokens = o.optInt("outTok", 0),
