@@ -13,6 +13,7 @@ import com.shenliao.deepchat.data.Conversation
 import com.shenliao.deepchat.data.ConversationStore
 import com.shenliao.deepchat.data.Message
 import com.shenliao.deepchat.data.Prefs
+import com.shenliao.deepchat.data.Reply
 import com.shenliao.deepchat.data.Settings
 import com.shenliao.deepchat.net.ApiException
 import com.shenliao.deepchat.net.ChatApi
@@ -192,7 +193,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             stopRequested = false
             try {
                 val userMsg = Message(role = "user", text = trimmed, attachments = atts)
-                val assistant = Message(role = "assistant")
+                val assistant = Message(role = "assistant", replies = listOf(Reply()))
                 val base = existing ?: Conversation()
                 val updated = base.copy(
                     title = if (base.messages.isEmpty()) titleOf(trimmed, atts) else base.title,
@@ -205,7 +206,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     conversations.map { if (it.id == updated.id) updated else it }
                 }
                 currentId = updated.id
-                executeTurn(updated.id, assistant.id)
+                executeTurn(updated.id, assistant.id, 0)
                 persist()
             } finally {
                 streaming = false
@@ -214,24 +215,82 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 重新生成某条助手消息。 */
+    /** 再生成一个候选回答（左右箭头切换） */
     fun regenerate(messageId: String) {
         if (streaming) return
         val conv = current ?: return
-        val idx = conv.messages.indexOfFirst { it.id == messageId }
-        if (idx < 0) return
-        val kept = conv.messages.subList(0, idx).toList()
-        val assistant = Message(role = "assistant")
+        val target = conv.messages.firstOrNull { it.id == messageId } ?: return
+        if (target.isUser) return
+        val newIndex = target.replies.size
+
         val updated = conv.copy(
-            messages = kept + assistant,
+            messages = conv.messages.map {
+                if (it.id == messageId) {
+                    it.copy(replies = it.replies + Reply(), selected = newIndex)
+                } else {
+                    it
+                }
+            },
             updatedAt = System.currentTimeMillis(),
         )
         conversations = conversations.map { if (it.id == updated.id) updated else it }
+
         turnJob = viewModelScope.launch {
             streaming = true
             stopRequested = false
             try {
-                executeTurn(updated.id, assistant.id)
+                executeTurn(updated.id, messageId, newIndex)
+                persist()
+            } finally {
+                streaming = false
+                activeCall = null
+            }
+        }
+    }
+
+    /** 改变某条助手消息当前展示的候选 */
+    fun selectReply(messageId: String, index: Int) {
+        val conv = current ?: return
+        var changed = false
+        val messages = conv.messages.map { m ->
+            if (m.id == messageId && index in m.replies.indices && m.selected != index) {
+                changed = true
+                m.copy(selected = index)
+            } else {
+                m
+            }
+        }
+        if (!changed) return
+        conversations = conversations.map {
+            if (it.id == conv.id) it.copy(messages = messages) else it
+        }
+        persist()
+    }
+
+    /** 编辑一条用户消息，并从这条开始重新生成 */
+    fun editAndResend(messageId: String, newText: String) {
+        if (streaming) return
+        val conv = current ?: return
+        val idx = conv.messages.indexOfFirst { it.id == messageId }
+        if (idx < 0 || !conv.messages[idx].isUser) return
+        val text = newText.trim()
+        if (text.isEmpty()) return
+
+        val kept = conv.messages.subList(0, idx).toList()
+        val edited = conv.messages[idx].copy(text = text)
+        val assistant = Message(role = "assistant", replies = listOf(Reply()))
+        val updated = conv.copy(
+            title = if (kept.isEmpty()) titleOf(text, emptyList()) else conv.title,
+            messages = kept + edited + assistant,
+            updatedAt = System.currentTimeMillis(),
+        )
+        conversations = conversations.map { if (it.id == updated.id) updated else it }
+
+        turnJob = viewModelScope.launch {
+            streaming = true
+            stopRequested = false
+            try {
+                executeTurn(updated.id, assistant.id, 0)
                 persist()
             } finally {
                 streaming = false
@@ -245,15 +304,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { activeCall?.cancel() }
     }
 
-    private suspend fun executeTurn(convId: String, assistantId: String) {
+    private suspend fun executeTurn(convId: String, assistantId: String, replyIndex: Int) {
         val conv = conversations.firstOrNull { it.id == convId } ?: return
-        val history = conv.messages.filter { it.id != assistantId }
+        // 只取到这个助手消息之前的历史（含用户消息）
+        val stopIndex = conv.messages.indexOfFirst { it.id == assistantId }
+        val history = if (stopIndex >= 0) conv.messages.subList(0, stopIndex).toList() else conv.messages
 
         val body = ChatApi.buildBody(settings, history, stream = true)
         val call = try {
             ChatApi.newCall(body, settings, stream = true)
         } catch (t: Throwable) {
-            patchMessage(convId, assistantId) { it.copy(error = "地址不合法：${t.message ?: ""}") }
+            patchReply(convId, assistantId, replyIndex) { it.copy(error = "地址不合法：${t.message ?: ""}") }
             return
         }
         activeCall = call
@@ -274,7 +335,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val r = reasoning.toString()
             val tc = toolCalls
             val ct = citations
-            patchMessage(convId, assistantId) {
+            patchReply(convId, assistantId, replyIndex) {
                 it.copy(
                     text = c,
                     reasoning = r,
@@ -319,8 +380,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stopRequested = false
         val error = errMsg
 
+        // 接口没下发引用时，从正文里兜底提取链接当来源
+        val finalCitations = if (citations.isBlank()) extractCitations(content.toString()) else citations
+
         if (error != null && !stopped) {
-            patchMessage(convId, assistantId) {
+            patchReply(convId, assistantId, replyIndex) {
                 it.copy(
                     text = content.toString(),
                     reasoning = reasoning.toString(),
@@ -328,18 +392,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     inputTokens = inTok,
                     outputTokens = outTok,
                     serverToolCalls = toolCalls,
-                    citations = citations,
+                    citations = finalCitations,
                 )
             }
         } else if (content.isBlank() && reasoning.isBlank() && !stopped) {
-            patchMessage(convId, assistantId) {
+            patchReply(convId, assistantId, replyIndex) {
                 it.copy(
                     error = "模型没有返回任何内容，可以点重试",
                     serverToolCalls = toolCalls,
-                    citations = citations,
+                    citations = finalCitations,
                 )
             }
+        } else if (finalCitations != citations) {
+            patchReply(convId, assistantId, replyIndex) { it.copy(citations = finalCitations) }
         }
+    }
+
+    /** 从回答正文里找 http(s) 链接，兜底做来源列表 */
+    private fun extractCitations(text: String): String {
+        if (text.isBlank()) return ""
+        val urls = Regex("https?://[^\\s<>()\\[\\]\"'，。；、）]+")
+            .findAll(text)
+            .map { it.value.trimEnd('.', ',', ';', ':', ')', ']', '。', '，', '；') }
+            .filter { it.length > 12 }
+            .distinct()
+            .take(20)
+            .toList()
+        if (urls.isEmpty()) return ""
+        val arr = JSONArray()
+        urls.forEach { arr.put(JSONObject().put("url", it).put("title", "")) }
+        return arr.toString()
     }
 
     // ---------------------------------------------------------------- 工具
@@ -409,13 +491,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun patchMessage(convId: String, msgId: String, block: (Message) -> Message) {
+    private fun patchReply(convId: String, msgId: String, index: Int, block: (Reply) -> Reply) {
         conversations = conversations.map { c ->
-            if (c.id != convId) c
-            else c.copy(
-                messages = c.messages.map { m -> if (m.id == msgId) block(m) else m },
-                updatedAt = System.currentTimeMillis(),
-            )
+            if (c.id != convId) {
+                c
+            } else {
+                c.copy(
+                    messages = c.messages.map { m ->
+                        if (m.id != msgId) {
+                            m
+                        } else {
+                            m.copy(
+                                replies = m.replies.mapIndexed { i, r -> if (i == index) block(r) else r },
+                            )
+                        }
+                    },
+                    updatedAt = System.currentTimeMillis(),
+                )
+            }
         }
     }
 

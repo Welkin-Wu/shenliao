@@ -165,7 +165,7 @@ fun ChatScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    val lastLength = messages.lastOrNull()?.text?.length ?: 0
+    val lastLength = messages.lastOrNull()?.body?.length ?: 0
     LaunchedEffect(lastLength) {
         if (!vm.streaming || messages.isEmpty()) return@LaunchedEffect
         val info = listState.layoutInfo
@@ -288,6 +288,8 @@ fun ChatScreen(
                                 Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
                             },
                             onRegenerate = { vm.regenerate(msg.id) },
+                            onSelectReply = { index -> vm.selectReply(msg.id, index) },
+                            onEdit = { newText -> vm.editAndResend(msg.id, newText) },
                         )
                     }
                 }

@@ -58,55 +58,130 @@ data class Attachment(
     }
 }
 
-data class Message(
-    val id: String = UUID.randomUUID().toString(),
-    val role: String,
+/** 一次生成的结果，一条助手消息可以有多个候选（左右箭头切换）。 */
+data class Reply(
     val text: String = "",
     val reasoning: String = "",
-    val attachments: List<Attachment> = emptyList(),
-    val error: String? = null,
+    /** 联网来源引用（JSON 数组：[{url,title}]） */
+    val citations: String = "",
+    /** 联网工具的服务端调用记录，多轮要原样回传 */
+    val serverToolCalls: String = "",
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
-    /** 联网工具的服务端调用记录，多轮要原样回传（DeepSeek 扩展字段） */
-    val serverToolCalls: String = "",
-    /** 联网回答的来源引用（JSON 数组：[{url,title}]） */
-    val citations: String = "",
+    val error: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
-    val isUser: Boolean get() = role == "user"
-
     fun toJson(): JSONObject = JSONObject().apply {
-        put("id", id)
-        put("role", role)
         put("text", text)
         if (reasoning.isNotEmpty()) put("reasoning", reasoning)
-        if (attachments.isNotEmpty()) {
-            put("att", JSONArray().also { arr -> attachments.forEach { arr.put(it.toJson()) } })
-        }
-        error?.let { put("error", it) }
+        if (citations.isNotEmpty()) put("cites", citations)
+        if (serverToolCalls.isNotEmpty()) put("toolCalls", serverToolCalls)
         if (inputTokens > 0) put("inTok", inputTokens)
         if (outputTokens > 0) put("outTok", outputTokens)
-        if (serverToolCalls.isNotEmpty()) put("toolCalls", serverToolCalls)
-        if (citations.isNotEmpty()) put("cites", citations)
+        error?.let { put("error", it) }
         put("ts", createdAt)
     }
 
     companion object {
-        fun fromJson(o: JSONObject): Message = Message(
-            id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
-            role = o.optString("role", "assistant"),
+        fun fromJson(o: JSONObject): Reply = Reply(
             text = o.optString("text", ""),
             reasoning = o.optString("reasoning", ""),
-            attachments = o.optJSONArray("att")?.let { arr ->
-                (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let(Attachment::fromJson) }
-            } ?: emptyList(),
-            error = if (o.has("error")) o.optString("error") else null,
+            citations = o.optString("cites", ""),
+            serverToolCalls = o.optString("toolCalls", ""),
             inputTokens = o.optInt("inTok", 0),
             outputTokens = o.optInt("outTok", 0),
-            serverToolCalls = o.optString("toolCalls", ""),
-            citations = o.optString("cites", ""),
+            error = if (o.has("error")) o.optString("error") else null,
             createdAt = o.optLong("ts", System.currentTimeMillis()),
         )
+    }
+}
+
+data class Message(
+    val id: String = UUID.randomUUID().toString(),
+    /** user / assistant */
+    val role: String,
+    /** 用户消息的正文 */
+    val text: String = "",
+    val attachments: List<Attachment> = emptyList(),
+    /** 助手消息的候选回答 */
+    val replies: List<Reply> = emptyList(),
+    /** 当前展示第几个候选 */
+    val selected: Int = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+) {
+    val isUser: Boolean get() = role == "user"
+
+    val reply: Reply?
+        get() = if (replies.isEmpty()) null else replies[selected.coerceIn(0, replies.lastIndex)]
+
+    /** 当前候选的正文，用户消息直接取 text */
+    val body: String
+        get() = if (isUser) text else (reply?.text ?: "")
+
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("role", role)
+        if (isUser) {
+            put("text", text)
+            if (attachments.isNotEmpty()) {
+                put("att", JSONArray().also { arr -> attachments.forEach { arr.put(it.toJson()) } })
+            }
+        } else {
+            if (replies.isNotEmpty()) {
+                put("replies", JSONArray().also { arr -> replies.forEach { arr.put(it.toJson()) } })
+            }
+            put("sel", selected)
+        }
+        put("ts", createdAt)
+    }
+
+    companion object {
+        fun fromJson(o: JSONObject): Message {
+            val role = o.optString("role", "assistant")
+            val attachments = o.optJSONArray("att")?.let { arr ->
+                (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let(Attachment::fromJson) }
+            } ?: emptyList()
+
+            val replies = o.optJSONArray("replies")?.let { arr ->
+                (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let(Reply::fromJson) }
+            } ?: emptyList()
+
+            // 兼容 1.4 及更早的存档：助手消息的正文直接存在 text 字段里
+            val migrated = if (role != "user" && replies.isEmpty()) {
+                val legacyText = o.optString("text", "")
+                val legacyReasoning = o.optString("reasoning", "")
+                val legacyError = if (o.has("error")) o.optString("error") else null
+                val hasSomething = legacyText.isNotBlank() || legacyReasoning.isNotBlank() || legacyError != null
+                if (hasSomething) {
+                    listOf(
+                        Reply(
+                            text = legacyText,
+                            reasoning = legacyReasoning,
+                            citations = o.optString("cites", ""),
+                            serverToolCalls = o.optString("toolCalls", ""),
+                            inputTokens = o.optInt("inTok", 0),
+                            outputTokens = o.optInt("outTok", 0),
+                            error = legacyError,
+                            createdAt = o.optLong("ts", System.currentTimeMillis()),
+                        ),
+                    )
+                } else {
+                    listOf(Reply())
+                }
+            } else {
+                replies
+            }
+
+            return Message(
+                id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
+                role = role,
+                text = if (role == "user") o.optString("text", "") else "",
+                attachments = attachments,
+                replies = migrated,
+                selected = o.optInt("sel", 0),
+                createdAt = o.optLong("ts", System.currentTimeMillis()),
+            )
+        }
     }
 }
 

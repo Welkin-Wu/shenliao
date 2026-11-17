@@ -25,8 +25,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -34,8 +37,11 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,84 +76,226 @@ fun MessageRow(
     isLast: Boolean,
     onCopy: (String) -> Unit,
     onRegenerate: () -> Unit,
+    onSelectReply: (Int) -> Unit,
+    onEdit: (String) -> Unit,
 ) {
     if (message.isUser) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-            Column(
-                modifier = Modifier.widthIn(max = 320.dp),
-                horizontalAlignment = Alignment.End,
-            ) {
-                AttachmentStrip(message.attachments)
-                if (message.text.isNotBlank()) {
-                    Surface(
-                        color = AppColors.BubbleUser,
-                        shape = RoundedCornerShape(18.dp, 18.dp, 6.dp, 18.dp),
-                    ) {
-                        Text(
-                            text = message.text,
-                            color = AppColors.TextMain,
-                            fontSize = 15.sp,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        )
-                    }
-                }
-            }
-        }
+        UserBubble(message, onEdit)
         return
     }
 
+    val reply = message.reply ?: return
+    val hasContent = reply.text.isNotBlank() || reply.reasoning.isNotBlank() || reply.error != null
+
     Column(Modifier.fillMaxWidth()) {
-        if (message.reasoning.isNotBlank()) {
-            ThinkingBlock(message.reasoning, streaming = streaming)
+        if (reply.reasoning.isNotBlank()) {
+            ThinkingBlock(reply.reasoning, streaming = streaming)
             Spacer(Modifier.height(8.dp))
         }
 
-        if (message.text.isNotBlank()) {
-            MarkdownText(message.text)
-        } else if (streaming && message.reasoning.isBlank()) {
+        if (reply.text.isNotBlank()) {
+            MarkdownText(reply.text)
+        } else if (streaming && reply.reasoning.isBlank()) {
             TypingDots()
         }
 
-        if (message.citations.isNotBlank()) {
-            CitationBlock(message.citations)
+        if (reply.citations.isNotBlank()) {
+            CitationBlock(reply.citations)
         }
 
-        if (message.error != null) {
+        if (reply.error != null) {
             Spacer(Modifier.height(8.dp))
-            ErrorCard(message.error, onRetry = onRegenerate)
+            ErrorCard(reply.error, onRetry = onRegenerate)
         }
 
-        if (!streaming && (message.text.isNotBlank() || message.error != null)) {
+        if (!streaming && hasContent) {
             Row(
                 modifier = Modifier.padding(top = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (message.text.isNotBlank()) {
-                    TextButton(onClick = { onCopy(message.text) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp)) {
+                if (reply.text.isNotBlank()) {
+                    TextButton(
+                        onClick = { onCopy(reply.text) },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
+                    ) {
                         Icon(Icons.Outlined.ContentCopy, null, tint = AppColors.TextFaint, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("复制", fontSize = 12.sp, color = AppColors.TextFaint)
                     }
                 }
-                if (isLast) {
-                    TextButton(onClick = onRegenerate, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp)) {
-                        Icon(Icons.Outlined.Refresh, null, tint = AppColors.TextFaint, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("重试", fontSize = 12.sp, color = AppColors.TextFaint)
-                    }
+                TextButton(
+                    onClick = onRegenerate,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
+                ) {
+                    Icon(Icons.Outlined.Refresh, null, tint = AppColors.TextFaint, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("重新生成", fontSize = 12.sp, color = AppColors.TextFaint)
                 }
-                if (message.outputTokens > 0) {
+
+                if (message.replies.size > 1) {
+                    Spacer(Modifier.width(4.dp))
+                    VariantSwitcher(
+                        index = message.selected.coerceIn(0, message.replies.lastIndex),
+                        total = message.replies.size,
+                        onSelect = onSelectReply,
+                    )
+                }
+
+                if (reply.outputTokens > 0) {
+                    Spacer(Modifier.weight(1f))
                     Text(
-                        text = "↑${message.inputTokens} ↓${message.outputTokens} tokens",
+                        text = "↑${reply.inputTokens} ↓${reply.outputTokens}",
                         fontSize = 11.sp,
                         color = AppColors.TextFaint,
-                        modifier = Modifier.padding(start = 4.dp),
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun VariantSwitcher(index: Int, total: Int, onSelect: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .clickable(enabled = index > 0) { onSelect(index - 1) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.ChevronLeft,
+                contentDescription = "上一个回答",
+                tint = if (index > 0) AppColors.TextDim else AppColors.Border,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Text(
+            text = "${index + 1}/$total",
+            fontSize = 11.sp,
+            color = AppColors.TextDim,
+        )
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .clickable(enabled = index < total - 1) { onSelect(index + 1) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.ChevronRight,
+                contentDescription = "下一个回答",
+                tint = if (index < total - 1) AppColors.TextDim else AppColors.Border,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserBubble(message: Message, onEdit: (String) -> Unit) {
+    var editing by remember { mutableStateOf(false) }
+
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        Column(
+            modifier = Modifier.widthIn(max = 320.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            AttachmentStrip(message.attachments)
+            if (message.text.isNotBlank()) {
+                Surface(
+                    color = AppColors.BubbleUser,
+                    shape = RoundedCornerShape(18.dp, 18.dp, 6.dp, 18.dp),
+                ) {
+                    Text(
+                        text = message.text,
+                        color = AppColors.TextMain,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { editing = true }
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Outlined.Edit,
+                    contentDescription = null,
+                    tint = AppColors.TextFaint,
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("编辑", fontSize = 11.sp, color = AppColors.TextFaint)
+            }
+        }
+    }
+
+    if (editing) {
+        EditMessageDialog(
+            initial = message.text,
+            onDismiss = { editing = false },
+            onConfirm = {
+                editing = false
+                onEdit(it)
+            },
+        )
+    }
+}
+
+@Composable
+private fun EditMessageDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("修改这条提问", fontSize = 16.sp) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 8,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, lineHeight = 21.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = AppColors.SurfaceHigh,
+                        unfocusedContainerColor = AppColors.SurfaceHigh,
+                        focusedBorderColor = AppColors.Primary.copy(alpha = 0.55f),
+                        unfocusedBorderColor = AppColors.Border,
+                        cursorColor = AppColors.Primary,
+                        focusedTextColor = AppColors.TextMain,
+                        unfocusedTextColor = AppColors.TextMain,
+                    ),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "保存后会从这条开始重新回答，后面的对话会被替换。",
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = AppColors.TextFaint,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) {
+                Text("重新生成", color = AppColors.Primary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+        containerColor = AppColors.Surface,
+        titleContentColor = AppColors.TextMain,
+        textContentColor = AppColors.TextDim,
+    )
 }
 
 @Composable

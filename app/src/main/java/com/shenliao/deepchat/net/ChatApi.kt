@@ -98,16 +98,17 @@ object ChatApi {
         var docCount = 0
         for (m in history) {
             if (m.role != "user" && m.role != "assistant") continue
-            if (m.error != null) continue
-            val text = m.text.trim()
+            val rep = m.reply
+            if (!m.isUser && (rep == null || rep.error != null)) continue
+            val text = if (m.isUser) m.text.trim() else (rep?.text ?: "").trim()
             val atts = if (m.isUser) m.attachments else emptyList()
             if (text.isEmpty() && atts.isEmpty()) continue
 
             val obj = JSONObject().put("role", m.role)
             if (atts.isEmpty()) {
                 obj.put("content", text)
-                if (m.role == "assistant" && m.serverToolCalls.isNotBlank()) {
-                    runCatching { JSONArray(m.serverToolCalls) }.getOrNull()?.let {
+                if (m.role == "assistant" && rep != null && rep.serverToolCalls.isNotBlank()) {
+                    runCatching { JSONArray(rep.serverToolCalls) }.getOrNull()?.let {
                         obj.put("server_tool_calls", it)
                     }
                 }
@@ -256,8 +257,10 @@ object ChatApi {
 
                 // 联网工具：服务端调用记录，多轮要原样回传
                 collect(choice.optJSONArray("server_tool_calls"))
-                // 引用来源
+                // 引用来源：流式里可能挂在 delta / choice / message 任一处
                 collectCitations(choice.optJSONArray("annotations"))
+                collectCitations(choice.optJSONObject("message")?.optJSONArray("annotations"))
+                collectCitations(chunk.optJSONArray("annotations"))
                 val delta = choice.optJSONObject("delta") ?: continue
                 collect(delta.optJSONArray("server_tool_calls"))
                 collectCitations(delta.optJSONArray("annotations"))
