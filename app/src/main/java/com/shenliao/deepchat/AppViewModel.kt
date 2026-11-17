@@ -380,8 +380,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stopRequested = false
         val error = errMsg
 
-        // 接口没下发引用时，从正文里兜底提取链接当来源
-        val finalCitations = if (citations.isBlank()) extractCitations(content.toString()) else citations
+        // 引用兜底：① 正文里的链接 → ② 用模型真实用过的搜索词再搜一次
+        var finalCitations = citations
+        if (finalCitations.isBlank()) {
+            finalCitations = extractCitations(content.toString())
+        }
+        if (finalCitations.isBlank() && !stopped && content.isNotBlank() && ChatApi.wantsWeb(settings)) {
+            val queries = parseSearchQueries(toolCalls)
+            val query = queries.firstOrNull() ?: lastUserText(history)
+            if (query.isNotBlank()) {
+                val remote = withContext(Dispatchers.IO) {
+                    runCatching { ChatApi.search(settings, query, 6) }.getOrDefault("")
+                }
+                if (remote.isNotBlank() && remote != "[]") finalCitations = remote
+            }
+        }
 
         if (error != null && !stopped) {
             patchReply(convId, assistantId, replyIndex) {
@@ -407,6 +420,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             patchReply(convId, assistantId, replyIndex) { it.copy(citations = finalCitations) }
         }
     }
+
+    /** 从 server_tool_calls 里捞出模型真正用过的搜索词 */
+    private fun parseSearchQueries(toolCallsJson: String): List<String> {
+        if (toolCallsJson.isBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(toolCallsJson)
+            val out = mutableListOf<String>()
+            for (i in 0 until arr.length()) {
+                val input = arr.optJSONObject(i)?.optJSONObject("input") ?: continue
+                val queries = input.optJSONArray("queries")
+                if (queries != null) {
+                    for (j in 0 until queries.length()) {
+                        queries.optString(j).takeIf { it.isNotBlank() }?.let { out.add(it) }
+                    }
+                } else {
+                    input.optString("url", "").takeIf { it.isNotBlank() }?.let { out.add(it) }
+                }
+            }
+            out.distinct().take(3)
+        }.getOrDefault(emptyList())
+    }
+
+    private fun lastUserText(history: List<Message>): String =
+        history.lastOrNull { it.isUser }?.text?.trim()?.replace("\n", " ")?.take(60) ?: ""
 
     /** 从回答正文里找 http(s) 链接，兜底做来源列表 */
     private fun extractCitations(text: String): String {

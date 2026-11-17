@@ -14,7 +14,6 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-
 class ApiException(val status: Int, val detail: String) : IOException(detail)
 
 /**
@@ -67,6 +66,55 @@ object ChatApi {
         if (settings.preset != Settings.PRESET_DEEPSEEK) return false
         val model = settings.model.trim().lowercase()
         return model == "deepseek-flash" || model == "deepseek-v4-flash"
+    }
+
+    fun searchEndpointOf(baseUrl: String): String {
+        val b = baseUrl.trim().trimEnd('/')
+        return when {
+            b.isEmpty() -> "https://api.deepseek.com/v1/tools/search"
+            b.endsWith("/tools/search") -> b
+            b.endsWith("/v1") -> "$b/tools/search"
+            else -> "$b/v1/tools/search"
+        }
+    }
+
+    /**
+     * 兜底用：接口没下发引用时，自己调一次 Search API 补来源。
+     * 返回 JSON 数组 [{url,title}]。
+     */
+    fun search(settings: Settings, query: String, count: Int = 6): String {
+        val body = JSONObject()
+            .put("query", query.take(120))
+            .put("count", count.coerceIn(1, 50))
+        val request = Request.Builder()
+            .url(searchEndpointOf(settings.baseUrl))
+            .header("Authorization", "Bearer ${settings.apiKey.trim()}")
+            .header("Content-Type", "application/json")
+            .post(body.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        val call = client.newBuilder()
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
+            .build()
+            .newCall(request)
+        call.execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw ApiException(resp.code, readableError(text))
+            val results = runCatching { JSONObject(text).optJSONArray("results") }.getOrNull()
+                ?: return "[]"
+            val out = JSONArray()
+            for (i in 0 until results.length()) {
+                val r = results.optJSONObject(i) ?: continue
+                val url = r.optString("url", "")
+                if (url.isBlank()) continue
+                out.put(
+                    JSONObject()
+                        .put("url", url)
+                        .put("title", r.optString("title", "")),
+                )
+            }
+            return out.toString()
+        }
     }
 
     /** 构造请求体。history 里不应包含正在生成的占位消息。 */

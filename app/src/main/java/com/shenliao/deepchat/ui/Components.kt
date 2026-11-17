@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -131,16 +132,6 @@ fun MessageRow(
                     Spacer(Modifier.width(4.dp))
                     Text("重新生成", fontSize = 12.sp, color = AppColors.TextFaint)
                 }
-
-                if (message.replies.size > 1) {
-                    Spacer(Modifier.width(4.dp))
-                    VariantSwitcher(
-                        index = message.selected.coerceIn(0, message.replies.lastIndex),
-                        total = message.replies.size,
-                        onSelect = onSelectReply,
-                    )
-                }
-
                 if (reply.outputTokens > 0) {
                     Spacer(Modifier.weight(1f))
                     Text(
@@ -150,16 +141,32 @@ fun MessageRow(
                     )
                 }
             }
+
+            if (message.replies.size > 1) {
+                Spacer(Modifier.height(6.dp))
+                VariantSwitcher(
+                    index = message.selected.coerceIn(0, message.replies.lastIndex),
+                    total = message.replies.size,
+                    onSelect = onSelectReply,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun VariantSwitcher(index: Int, total: Int, onSelect: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(AppColors.Surface)
+            .border(1.dp, AppColors.Border, RoundedCornerShape(50))
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
             modifier = Modifier
-                .size(26.dp)
+                .size(30.dp)
                 .clip(CircleShape)
                 .clickable(enabled = index > 0) { onSelect(index - 1) },
             contentAlignment = Alignment.Center,
@@ -167,18 +174,19 @@ private fun VariantSwitcher(index: Int, total: Int, onSelect: (Int) -> Unit) {
             Icon(
                 Icons.Outlined.ChevronLeft,
                 contentDescription = "上一个回答",
-                tint = if (index > 0) AppColors.TextDim else AppColors.Border,
-                modifier = Modifier.size(16.dp),
+                tint = if (index > 0) AppColors.Primary else AppColors.Border,
+                modifier = Modifier.size(18.dp),
             )
         }
         Text(
-            text = "${index + 1}/$total",
-            fontSize = 11.sp,
-            color = AppColors.TextDim,
+            text = "回答 ${index + 1}/${total}",
+            fontSize = 12.sp,
+            color = AppColors.TextMain,
+            modifier = Modifier.padding(horizontal = 2.dp),
         )
         Box(
             modifier = Modifier
-                .size(26.dp)
+                .size(30.dp)
                 .clip(CircleShape)
                 .clickable(enabled = index < total - 1) { onSelect(index + 1) },
             contentAlignment = Alignment.Center,
@@ -186,8 +194,8 @@ private fun VariantSwitcher(index: Int, total: Int, onSelect: (Int) -> Unit) {
             Icon(
                 Icons.Outlined.ChevronRight,
                 contentDescription = "下一个回答",
-                tint = if (index < total - 1) AppColors.TextDim else AppColors.Border,
-                modifier = Modifier.size(16.dp),
+                tint = if (index < total - 1) AppColors.Primary else AppColors.Border,
+                modifier = Modifier.size(18.dp),
             )
         }
     }
