@@ -60,13 +60,24 @@ object ChatApi {
         return c.newCall(request)
     }
 
-    /** 联网工具只在官方接口 + deepseek-flash 下可用 */
-    fun wantsWeb(settings: Settings): Boolean {
-        if (!settings.webSearch) return false
+    /** 服务端联网工具只在官方接口 + deepseek-flash 下可用 */
+    fun supportsWebTools(settings: Settings): Boolean {
         if (settings.preset != Settings.PRESET_DEEPSEEK) return false
         val model = settings.model.trim().lowercase()
         return model == "deepseek-flash" || model == "deepseek-v4-flash"
     }
+
+    /** 联网搜索（含补搜兜底的开关判断） */
+    fun wantsSearch(settings: Settings): Boolean =
+        settings.webSearch && supportsWebTools(settings)
+
+    /** 阅读链接：消息里有 URL 时让模型自己去抓 */
+    fun wantsReadUrl(settings: Settings): Boolean =
+        settings.readUrl && supportsWebTools(settings)
+
+    /** 任意一个联网工具开着 */
+    fun wantsWeb(settings: Settings): Boolean =
+        wantsSearch(settings) || wantsReadUrl(settings)
 
     fun searchEndpointOf(baseUrl: String): String {
         val b = baseUrl.trim().trimEnd('/')
@@ -232,14 +243,16 @@ object ChatApi {
         if (stream && settings.preset == Settings.PRESET_DEEPSEEK) {
             body.put("stream_options", JSONObject().put("include_usage", true))
         }
-        if (wantsWeb(settings)) {
-            // 服务端工具：模型自己决定搜不搜，客户端不执行任何工具
-            body.put(
-                "tools",
-                JSONArray()
-                    .put(JSONObject().put("type", "deepseek_web_search").put("name", "deepseek_web_search"))
-                    .put(JSONObject().put("type", "deepseek_read_url").put("name", "deepseek_read_url")),
-            )
+        if (wantsSearch(settings) || wantsReadUrl(settings)) {
+            // 服务端工具：模型自己决定搜不搜/读不读，客户端不执行任何工具
+            val tools = JSONArray()
+            if (wantsSearch(settings)) {
+                tools.put(JSONObject().put("type", "deepseek_web_search").put("name", "deepseek_web_search"))
+            }
+            if (wantsReadUrl(settings)) {
+                tools.put(JSONObject().put("type", "deepseek_read_url").put("name", "deepseek_read_url"))
+            }
+            body.put("tools", tools)
         }
         return body
     }

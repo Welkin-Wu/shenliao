@@ -390,7 +390,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 citSource = "text"
             }
         }
-        if (finalCitations.isBlank() && !stopped && content.isNotBlank() && ChatApi.wantsWeb(settings)) {
+        if (finalCitations.isBlank() && !stopped && content.isNotBlank() && ChatApi.wantsSearch(settings)) {
             val queries = parseSearchQueries(toolCalls)
             val query = queries.firstOrNull() ?: lastUserText(history)
             if (query.isNotBlank()) {

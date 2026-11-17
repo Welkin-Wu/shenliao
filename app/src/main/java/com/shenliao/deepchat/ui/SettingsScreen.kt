@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -314,28 +315,24 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
             item {
                 SectionCard(
-                    title = "联网搜索",
-                    subtitle = "由 DeepSeek 服务端执行搜索与抓取，按成功请求计费；只在官方接口 + deepseek-flash 下生效",
+                    title = "联网",
+                    subtitle = "由 DeepSeek 服务端执行，按成功请求计费；只在官方接口 + deepseek-flash 下生效",
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("允许模型联网", fontSize = 14.sp, color = AppColors.TextMain)
-                            Text(
-                                if (s.webSearch) "模型自己决定要不要搜，回答会带引用来源" else "只用训练数据回答",
-                                fontSize = 11.sp,
-                                color = AppColors.TextFaint,
-                            )
-                        }
-                        Switch(
-                            checked = s.webSearch,
-                            onCheckedChange = { vm.updateSettings(vm.settings.copy(webSearch = it)) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = AppColors.Primary,
-                                uncheckedTrackColor = AppColors.SurfaceHigh,
-                            ),
-                        )
-                    }
+                    ToggleRow(
+                        title = "联网搜索",
+                        desc = if (s.webSearch) "模型自己判断要不要搜，回答会带引用来源" else "只用训练数据回答，不联网",
+                        checked = s.webSearch,
+                        onChange = { vm.updateSettings(vm.settings.copy(webSearch = it)) },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(color = AppColors.Border.copy(alpha = 0.5f))
+                    Spacer(Modifier.height(10.dp))
+                    ToggleRow(
+                        title = "阅读链接（关联网页）",
+                        desc = if (s.readUrl) "消息里贴了网址，模型会自己去读那一页" else "贴了网址也不读，只按文字回答",
+                        checked = s.readUrl,
+                        onChange = { vm.updateSettings(vm.settings.copy(readUrl = it)) },
+                    )
                 }
             }
 
@@ -489,6 +486,30 @@ private fun SectionCard(
         }
         Spacer(Modifier.height(12.dp))
         content()
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    desc: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 14.sp, color = AppColors.TextMain)
+            Text(desc, fontSize = 11.sp, lineHeight = 16.sp, color = AppColors.TextFaint)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = AppColors.Primary,
+                uncheckedTrackColor = AppColors.SurfaceHigh,
+            ),
+        )
     }
 }
 

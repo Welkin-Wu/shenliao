@@ -19,6 +19,7 @@ class Prefs(ctx: Context) {
         maxTokens = sp.getInt("maxTokens", 0),
         docMode = sp.getString("docMode", Settings.DOC_MODE_TEXT) ?: Settings.DOC_MODE_TEXT,
         webSearch = sp.getBoolean("webSearch", true),
+        readUrl = sp.getBoolean("readUrl", true),
         mathFont = sp.getString("mathFont", "stix") ?: "stix",
     )
 
@@ -35,6 +36,7 @@ class Prefs(ctx: Context) {
             putInt("maxTokens", s.maxTokens)
             putString("docMode", s.docMode)
             putBoolean("webSearch", s.webSearch)
+            putBoolean("readUrl", s.readUrl)
             putString("mathFont", s.mathFont)
         }
     }

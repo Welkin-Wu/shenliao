@@ -225,7 +225,7 @@ fun ChatScreen(
                 onToggleWeb = {
                     val next = !vm.settings.webSearch
                     vm.updateSettings(vm.settings.copy(webSearch = next))
-                    if (next && !ChatApi.wantsWeb(vm.settings.copy(webSearch = true))) {
+                    if (next && !ChatApi.supportsWebTools(vm.settings)) {
                         Toast.makeText(
                             context,
                             "联网需要「DeepSeek 官方」接口 + deepseek-flash 模型",
