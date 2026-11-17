@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk.idsig
+
+# 产物不入库，走 GitHub Releases
+dist/*.apk
+*.keystore
+*.jks
+keystore.properties

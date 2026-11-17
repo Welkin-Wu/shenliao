@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 对话气泡主体 -->
+    <path
+        android:fillColor="#F2F6FF"
+        android:pathData="M40,30 h28 a12,12 0 0 1 12,12 v16 a12,12 0 0 1 -12,12 h-28 a12,12 0 0 1 -12,-12 v-16 a12,12 0 0 1 12,-12 z" />
+    <!-- 气泡尾巴 -->
+    <path
+        android:fillColor="#F2F6FF"
+        android:pathData="M38,66 L38,84 L54,68 Z" />
+    <!-- 三个圆点 -->
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M40,48 m-3.6,0 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 z" />
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M54,48 m-3.6,0 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 z" />
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M68,48 m-3.6,0 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 z" />
+    <!-- 右上角火花 -->
+    <path
+        android:fillColor="#4C8DFF"
+        android:pathData="M84,20 L87,27 L94,30 L87,33 L84,40 L81,33 L74,30 L81,27 Z" />
+</vector>

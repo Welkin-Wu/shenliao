@@ -1,0 +1,410 @@
+package com.shenliao.deepchat
+
+import android.app.Application
+import android.net.Uri
+import android.os.SystemClock
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.shenliao.deepchat.data.Attachment
+import com.shenliao.deepchat.data.Conversation
+import com.shenliao.deepchat.data.ConversationStore
+import com.shenliao.deepchat.data.Message
+import com.shenliao.deepchat.data.Prefs
+import com.shenliao.deepchat.data.Settings
+import com.shenliao.deepchat.net.ApiException
+import com.shenliao.deepchat.net.ChatApi
+import com.shenliao.deepchat.net.FilesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Call
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+
+class AppViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val prefs = Prefs(app)
+    private val store = ConversationStore(app)
+
+    var conversations by mutableStateOf<List<Conversation>>(emptyList())
+        private set
+
+    var currentId by mutableStateOf<String?>(null)
+        private set
+
+    var streaming by mutableStateOf(false)
+        private set
+
+    var settings by mutableStateOf(prefs.load())
+        private set
+
+    var loaded by mutableStateOf(false)
+        private set
+
+    var pending by mutableStateOf<List<Attachment>>(emptyList())
+        private set
+
+    private var activeCall: Call? = null
+    private var turnJob: Job? = null
+    private var stopRequested = false
+
+    val current: Conversation?
+        get() = conversations.firstOrNull { it.id == currentId }
+
+    init {
+        viewModelScope.launch {
+            conversations = withContext(Dispatchers.IO) { store.load() }
+            currentId = conversations.firstOrNull()?.id
+            loaded = true
+        }
+    }
+
+    // ---------------------------------------------------------------- 会话管理
+
+    fun startNewChat() {
+        if (streaming) stop()
+        currentId = null
+    }
+
+    fun openConversation(id: String) {
+        if (streaming) stop()
+        currentId = id
+    }
+
+    fun deleteConversation(id: String) {
+        val wasCurrent = currentId == id
+        conversations = conversations.filterNot { it.id == id }
+        if (wasCurrent) currentId = conversations.firstOrNull()?.id
+        persist()
+    }
+
+    fun renameConversation(id: String, title: String) {
+        val t = title.trim().ifBlank { "未命名对话" }
+        conversations = conversations.map { if (it.id == id) it.copy(title = t) else it }
+        persist()
+    }
+
+    fun clearAllConversations() {
+        if (streaming) stop()
+        conversations = emptyList()
+        currentId = null
+        pending = emptyList()
+        viewModelScope.launch(Dispatchers.IO) { store.clearAll() }
+    }
+
+    fun updateSettings(next: Settings) {
+        settings = next
+        prefs.save(next)
+    }
+
+    // ---------------------------------------------------------------- 附件
+
+    fun attachImage(uri: Uri) {
+        if (pending.size >= 6) return
+        viewModelScope.launch {
+            val att = withContext(Dispatchers.IO) { store.importImage(uri) }
+            if (att != null) pending = pending + att
+        }
+    }
+
+    fun attachDocument(uri: Uri, displayName: String, mime: String) {
+        val snapshot = settings
+        viewModelScope.launch {
+            val imported = withContext(Dispatchers.IO) { store.importDocument(uri, displayName, mime) }
+            if (imported == null) return@launch
+            pending = pending + imported
+
+            if (!snapshot.ready) {
+                pending = pending.map {
+                    if (it.id == imported.id) {
+                        imported.copy(
+                            state = Attachment.STATE_ERROR,
+                            error = "还没填 API Key，填完再试",
+                        )
+                    } else {
+                        it
+                    }
+                }
+                return@launch
+            }
+
+            val purpose = purposeFor(imported.mime, snapshot.docMode)
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val id = FilesApi.upload(
+                        baseUrl = snapshot.baseUrl,
+                        apiKey = snapshot.apiKey,
+                        file = File(imported.path),
+                        filename = imported.name,
+                        mime = imported.mime,
+                        purpose = purpose,
+                    )
+                    imported.copy(
+                        remoteId = id,
+                        purpose = purpose,
+                        state = Attachment.STATE_READY,
+                        error = null,
+                    )
+                } catch (t: Throwable) {
+                    imported.copy(state = Attachment.STATE_ERROR, error = describe(t))
+                }
+            }
+            pending = pending.map { if (it.id == imported.id) result else it }
+        }
+    }
+
+    fun removePending(id: String) {
+        pending = pending.filterNot { it.id == id }
+    }
+
+    private fun purposeFor(mime: String, docMode: String): String {
+        val m = mime.lowercase()
+        val plain = m.startsWith("text/") || m.contains("json") || m.contains("csv") ||
+            m.contains("spreadsheet") || m.contains("ms-excel") ||
+            m.contains("epub") || m.contains("mobi")
+        if (plain) return "user_data"
+        return if (docMode == Settings.DOC_MODE_RICH) "rich_layout_recognition" else "text_recognition"
+    }
+
+    // ---------------------------------------------------------------- 发消息
+
+    fun send(rawText: String) {
+        if (streaming) return
+        if (!settings.ready) return
+        val trimmed = rawText.trim()
+        val atts = pending
+        if (trimmed.isEmpty() && atts.isEmpty()) return
+        if (atts.any { it.busy }) return
+        pending = emptyList()
+
+        val existing = current
+        turnJob = viewModelScope.launch {
+            streaming = true
+            stopRequested = false
+            try {
+                val userMsg = Message(role = "user", text = trimmed, attachments = atts)
+                val assistant = Message(role = "assistant")
+                val base = existing ?: Conversation()
+                val updated = base.copy(
+                    title = if (base.messages.isEmpty()) titleOf(trimmed, atts) else base.title,
+                    messages = base.messages + userMsg + assistant,
+                    updatedAt = System.currentTimeMillis(),
+                )
+                conversations = if (existing == null) {
+                    listOf(updated) + conversations
+                } else {
+                    conversations.map { if (it.id == updated.id) updated else it }
+                }
+                currentId = updated.id
+                executeTurn(updated.id, assistant.id)
+                persist()
+            } finally {
+                streaming = false
+                activeCall = null
+            }
+        }
+    }
+
+    /** 重新生成某条助手消息。 */
+    fun regenerate(messageId: String) {
+        if (streaming) return
+        val conv = current ?: return
+        val idx = conv.messages.indexOfFirst { it.id == messageId }
+        if (idx < 0) return
+        val kept = conv.messages.subList(0, idx).toList()
+        val assistant = Message(role = "assistant")
+        val updated = conv.copy(
+            messages = kept + assistant,
+            updatedAt = System.currentTimeMillis(),
+        )
+        conversations = conversations.map { if (it.id == updated.id) updated else it }
+        turnJob = viewModelScope.launch {
+            streaming = true
+            stopRequested = false
+            try {
+                executeTurn(updated.id, assistant.id)
+                persist()
+            } finally {
+                streaming = false
+                activeCall = null
+            }
+        }
+    }
+
+    fun stop() {
+        stopRequested = true
+        runCatching { activeCall?.cancel() }
+    }
+
+    private suspend fun executeTurn(convId: String, assistantId: String) {
+        val conv = conversations.firstOrNull { it.id == convId } ?: return
+        val history = conv.messages.filter { it.id != assistantId }
+
+        val body = ChatApi.buildBody(settings, history, stream = true)
+        val call = try {
+            ChatApi.newCall(body, settings, stream = true)
+        } catch (t: Throwable) {
+            patchMessage(convId, assistantId) { it.copy(error = "地址不合法：${t.message ?: ""}") }
+            return
+        }
+        activeCall = call
+
+        val content = StringBuilder()
+        val reasoning = StringBuilder()
+        var inTok = 0
+        var outTok = 0
+        var lastFlush = 0L
+
+        fun flush(force: Boolean) {
+            val now = SystemClock.uptimeMillis()
+            if (!force && now - lastFlush < 45L) return
+            lastFlush = now
+            val c = content.toString()
+            val r = reasoning.toString()
+            patchMessage(convId, assistantId) {
+                it.copy(text = c, reasoning = r, inputTokens = inTok, outputTokens = outTok)
+            }
+        }
+
+        val deltas = Channel<Delta>(Channel.UNLIMITED)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                ChatApi.stream(
+                    call,
+                    onContent = { deltas.trySend(Delta(content = it)) },
+                    onReasoning = { deltas.trySend(Delta(reason = it)) },
+                    onUsage = { i, o -> deltas.trySend(Delta(inTok = i, outTok = o)) },
+                )
+            } catch (t: Throwable) {
+                deltas.trySend(Delta(error = describe(t)))
+            } finally {
+                deltas.close()
+            }
+        }
+
+        var errMsg: String? = null
+        for (d in deltas) {
+            d.content?.let { content.append(it) }
+            d.reason?.let { reasoning.append(it) }
+            d.inTok?.let { inTok = it }
+            d.outTok?.let { outTok = it }
+            d.error?.let { if (errMsg == null) errMsg = it }
+            flush(false)
+        }
+        flush(true)
+
+        val stopped = stopRequested
+        stopRequested = false
+        val error = errMsg
+
+        if (error != null && !stopped) {
+            patchMessage(convId, assistantId) {
+                it.copy(
+                    text = content.toString(),
+                    reasoning = reasoning.toString(),
+                    error = if (content.isBlank()) error else null,
+                    inputTokens = inTok,
+                    outputTokens = outTok,
+                )
+            }
+        } else if (content.isBlank() && reasoning.isBlank() && !stopped) {
+            patchMessage(convId, assistantId) { it.copy(error = "模型没有返回任何内容，可以点重试") }
+        }
+    }
+
+    // ---------------------------------------------------------------- 工具
+
+    fun testConnection(onResult: (String) -> Unit) {
+        val s = settings
+        viewModelScope.launch {
+            val msg = withContext(Dispatchers.IO) {
+                try {
+                    if (!ChatApi.isUrlUsable(s.baseUrl)) {
+                        return@withContext "Base URL 不是合法地址"
+                    }
+                    if (s.apiKey.isBlank()) return@withContext "还没填 API Key"
+                    val body = JSONObject()
+                        .put("model", s.model.trim())
+                        .put("stream", false)
+                        .put("max_tokens", 16)
+                        .put("thinking", JSONObject().put("type", "disabled"))
+                        .put(
+                            "messages",
+                            JSONArray().put(
+                                JSONObject().put("role", "user").put("content", "只回复两个字：在线"),
+                            ),
+                        )
+                    val reply = ChatApi.complete(
+                        ChatApi.newCall(body, s, stream = false, timeoutSeconds = 40),
+                    )
+                    "连接成功 · 模型说：${reply.trim().take(40).ifBlank { "（空回复）" }}"
+                } catch (t: Throwable) {
+                    "连接失败：" + describe(t)
+                }
+            }
+            onResult(msg)
+        }
+    }
+
+    private fun describe(t: Throwable): String = when (t) {
+        is ApiException -> when (t.status) {
+            400 -> "请求被拒绝（400）：${t.detail}"
+            401 -> "API Key 无效或未授权（401）"
+            402 -> "账户余额不足（402）"
+            403 -> "没有权限访问该模型（403）"
+            404 -> "接口地址不存在（404），检查 Base URL：${t.detail}"
+            429 -> "请求太频繁或并发超限（429）"
+            in 500..599 -> "服务端错误（${t.status}）：${t.detail}"
+            else -> "HTTP ${t.status}：${t.detail}"
+        }
+        is UnknownHostException -> "域名解析失败，检查网络或 Base URL"
+        is SocketTimeoutException -> "请求超时，稍后重试"
+        is java.net.ConnectException -> "连不上服务器，检查网络或 Base URL"
+        is javax.net.ssl.SSLException -> "TLS 握手失败：${t.message ?: ""}"
+        is IOException -> t.message?.takeIf { it.isNotBlank() }?.let { "网络错误：$it" } ?: "网络错误"
+        else -> t.message ?: t.javaClass.simpleName
+    }
+
+    private fun titleOf(text: String, atts: List<Attachment>): String {
+        val t = text.trim().replace("\n", " ")
+        return when {
+            t.isNotEmpty() -> if (t.length > 22) t.take(22) + "…" else t
+            atts.any { it.isDoc } -> "文档对话"
+            atts.isNotEmpty() -> "图片对话"
+            else -> "新对话"
+        }
+    }
+
+    private fun patchMessage(convId: String, msgId: String, block: (Message) -> Message) {
+        conversations = conversations.map { c ->
+            if (c.id != convId) c
+            else c.copy(
+                messages = c.messages.map { m -> if (m.id == msgId) block(m) else m },
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    private fun persist() {
+        val snapshot = conversations
+        if (!loaded) return
+        viewModelScope.launch(Dispatchers.IO) { store.save(snapshot) }
+    }
+
+    private data class Delta(
+        val content: String? = null,
+        val reason: String? = null,
+        val inTok: Int? = null,
+        val outTok: Int? = null,
+        val error: String? = null,
+    )
+}

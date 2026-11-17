@@ -1,0 +1,12 @@
+# 统一行尾，避免 Windows 提交把仓库搞乱
+* text=auto eol=lf
+
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+gradlew  text eol=lf
+
+*.png    binary
+*.jpg    binary
+*.apk    binary
+*.jar    binary
+*.keystore binary
