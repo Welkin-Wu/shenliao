@@ -1,7 +1,7 @@
 # 深聊 · ShenLiao
 
 > 把 DeepSeek 装进口袋的 Android 客户端：**带自己的 API Key，对话只留在本机**。
-> 看图、读文档、思考过程实时可见、LaTeX 公式真排版，11 MB，没有广告也没有后台服务。
+> 看图、读文档、联网搜索、思考过程实时可见、LaTeX 公式真排版（内置数学字体），12 MB，没有广告也没有后台服务。
 
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Size](https://img.shields.io/badge/APK-11%20MB-informational)
 
-- 包名 `com.shenliao.deepchat` · 当前版本 **1.3**
+- 包名 `com.shenliao.deepchat` · 当前版本 **1.4**
 - 最低 Android 8.0（API 26），编译目标 API 35
 - 纯 Kotlin + Jetpack Compose，无 WebView、无第三方 SDK、无统计埋点
 
@@ -37,6 +37,7 @@ LaTeX 排版引擎离线渲染的样张（就是 App 里实际用的那套代码
 
 ## 最近更新
 
+- **1.4** 内置两款数学字体（STIX Two Math / Latin Modern Math），公式不再用系统黑体渲染，设置里可切换
 - **1.3** 修掉公式基线错位：上标盒子把「向上伸出的高度」算进 ascent 却没重新对齐基线，导致 `x²` 里的 `x` 被顶高
 - **1.2** 增加联网搜索：声明服务端工具 `deepseek_web_search` / `deepseek_read_url`，搜索与抓取都在服务端执行，客户端不跑任何工具；思考开启时走多步「深度思考搜索」
 
@@ -51,7 +52,7 @@ LaTeX 排版引擎离线渲染的样张（就是 App 里实际用的那套代码
 | 看图 | 相册多选（最多 6 张）或直接拍照；自动压到长边 1400px、纠正 EXIF 旋转 |
 | 读文档 | PDF / Word / PPT / Excel / EPUB / txt / md / csv，上传即解析，随消息引用 |
 | 思考模式 | 开关 + 推理强度（低/高/最高），`reasoning_content` 实时流出来，可折叠 |
-| LaTeX 公式 | `$$` 块级真排版，`$` 行内压 Unicode 混排，解析失败自动回退纯文本 |
+| LaTeX 公式 | `$$` 块级真排版，`$` 行内压 Unicode 混排，解析失败自动回退纯文本；内置 STIX Two Math / Latin Modern Math 两款数学字体 |
 | 本地历史 | 对话与附件全存 App 私有目录，可重命名、单删、一键清空 |
 | Markdown | 标题 / 列表 / 引用 / 代码块（带复制）/ 可点链接 |
 | 任意兼容接口 | Base URL 与模型名可改，任何 OpenAI 兼容服务都能接 |

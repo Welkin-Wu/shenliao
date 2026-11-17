@@ -4,16 +4,26 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.shenliao.deepchat.AppViewModel
+import com.shenliao.deepchat.ui.math.LocalMathFont
+import com.shenliao.deepchat.ui.math.MathFonts
 import kotlinx.coroutines.launch
 
 @Composable
 fun AppRoot(vm: AppViewModel) {
+    CompositionLocalProvider(LocalMathFont provides MathFonts.of(vm.settings.mathFont)) {
+        AppRootContent(vm)
+    }
+}
+
+@Composable
+private fun AppRootContent(vm: AppViewModel) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showOnboarding by rememberSaveable { mutableStateOf(!vm.settings.ready) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)

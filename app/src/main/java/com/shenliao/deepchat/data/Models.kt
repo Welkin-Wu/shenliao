@@ -149,6 +149,8 @@ data class Settings(
     val docMode: String = DOC_MODE_TEXT,
     /** 联网搜索（服务端工具 deepseek_web_search） */
     val webSearch: Boolean = true,
+    /** 公式字体：stix（默认，期刊风）/ lm（LaTeX 教科书风） */
+    val mathFont: String = "stix",
 ) {
     val ready: Boolean get() = apiKey.isNotBlank() && baseUrl.isNotBlank() && model.isNotBlank()
 

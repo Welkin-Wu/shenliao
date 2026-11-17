@@ -29,10 +29,12 @@ import com.shenliao.deepchat.ui.AppColors
 private class ComposeMeter(
     private val measurer: androidx.compose.ui.text.TextMeasurer,
     private val density: Density,
+    private val family: FontFamily,
 ) : TextMeter {
     override fun measure(text: String, sizePx: Float, italic: Boolean, bold: Boolean): TextBox {
         val style = TextStyle(
             fontSize = with(density) { sizePx.toSp() },
+            fontFamily = family,
             fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
             fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
         )
@@ -60,14 +62,15 @@ fun LatexMath(
 ) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer(cacheSize = 128)
+    val mathFamily = LocalMathFont.current
     val sizePx = with(density) { fontSize.toPx() }
 
     val parsed = remember(latex) { LatexParser.parse(latex) }
     val node = parsed.node
     if (node == null) return
 
-    val box = remember(node, sizePx, display) {
-        MathTypesetter(ComposeMeter(measurer, density), sizePx, display).layout(node)
+    val box = remember(node, sizePx, display, mathFamily) {
+        MathTypesetter(ComposeMeter(measurer, density, mathFamily), sizePx, display).layout(node)
     }
 
     val widthDp = with(density) { box.width.toDp() } + 2.dp
@@ -83,6 +86,7 @@ fun LatexMath(
                         is MOp.Txt -> {
                             val style = TextStyle(
                                 fontSize = with(density) { op.size.toSp() },
+                                fontFamily = mathFamily,
                                 fontStyle = if (op.italic) FontStyle.Italic else FontStyle.Normal,
                                 fontWeight = if (op.bold) FontWeight.Bold else FontWeight.Normal,
                                 color = color,

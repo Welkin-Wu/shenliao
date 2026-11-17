@@ -341,6 +341,35 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
             item {
                 SectionCard(
+                    title = "公式字体",
+                    subtitle = "内置两款 OFL 开源数学字体，实际渲染用它们，不再是系统黑体",
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SmallChip(
+                            selected = s.mathFont != "lm",
+                            onClick = { vm.updateSettings(vm.settings.copy(mathFont = "stix")) },
+                            icon = Icons.Outlined.Bolt,
+                            label = "STIX 期刊风",
+                        )
+                        SmallChip(
+                            selected = s.mathFont == "lm",
+                            onClick = { vm.updateSettings(vm.settings.copy(mathFont = "lm")) },
+                            icon = Icons.Outlined.Bolt,
+                            label = "Latin Modern 教科书风",
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "STIX 笔画更粗，深色背景和小字号下更清楚；Latin Modern 就是 LaTeX 默认那套字形。切换后已显示的公式会重新排版。",
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp,
+                        color = AppColors.TextFaint,
+                    )
+                }
+            }
+
+            item {
+                SectionCard(
                     title = "文件解析",
                     subtitle = "PDF / Word / PPT 会上传解析（按页计费）；txt、md、csv、xlsx 免费",
                 ) {
