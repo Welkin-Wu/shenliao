@@ -35,6 +35,12 @@ LaTeX 排版引擎离线渲染的样张（就是 App 里实际用的那套代码
 | --- | --- |
 | ![](dist/math-preview/math_3.png) | ![](dist/math-preview/math_8.png) |
 
+真机跑起来的样子（Android 模拟器 API 37）：
+
+| 对话：公式 + 来源 | 来源两级展开 | 编辑提问 | 多候选切换 |
+| --- | --- | --- | --- |
+| ![](dist/shot-02-chat.png) | ![](dist/shot-04-cite-detail.png) | ![](dist/shot-08-edit.png) | ![](dist/shot-05-variant2.png) |
+
 ## 最近更新
 
 - **1.4.2** 候选回答切换按钮独立成行（◀ 回答 1/2 ▶）；来源改用客户端主动调 Search API 兜底
