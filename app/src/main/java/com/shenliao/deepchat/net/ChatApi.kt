@@ -204,13 +204,33 @@ object ChatApi {
         onReasoning: (String) -> Unit,
         onUsage: (Int, Int) -> Unit,
         onToolCalls: (String) -> Unit = {},
+        onCitations: (String) -> Unit = {},
     ) {
         val toolCalls = JSONArray()
+        val citations = JSONArray()
+        val seenUrls = HashSet<String>()
 
         fun collect(src: JSONArray?) {
             if (src == null || src.length() == 0) return
             for (i in 0 until src.length()) toolCalls.put(src.opt(i))
             onToolCalls(toolCalls.toString())
+        }
+
+        fun collectCitations(src: JSONArray?) {
+            if (src == null || src.length() == 0) return
+            var added = false
+            for (i in 0 until src.length()) {
+                val o = src.optJSONObject(i) ?: continue
+                val url = o.optString("url", "")
+                if (url.isBlank() || !seenUrls.add(url)) continue
+                citations.put(
+                    JSONObject()
+                        .put("url", url)
+                        .put("title", o.optString("title", "")),
+                )
+                added = true
+            }
+            if (added) onCitations(citations.toString())
         }
 
         call.execute().use { resp ->
@@ -236,8 +256,11 @@ object ChatApi {
 
                 // 联网工具：服务端调用记录，多轮要原样回传
                 collect(choice.optJSONArray("server_tool_calls"))
+                // 引用来源
+                collectCitations(choice.optJSONArray("annotations"))
                 val delta = choice.optJSONObject("delta") ?: continue
                 collect(delta.optJSONArray("server_tool_calls"))
+                collectCitations(delta.optJSONArray("annotations"))
 
                 val reasoning = delta.optString("reasoning_content", "")
                 if (reasoning.isNotEmpty() && reasoning != "null") onReasoning(reasoning)

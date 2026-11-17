@@ -69,6 +69,8 @@ data class Message(
     val outputTokens: Int = 0,
     /** 联网工具的服务端调用记录，多轮要原样回传（DeepSeek 扩展字段） */
     val serverToolCalls: String = "",
+    /** 联网回答的来源引用（JSON 数组：[{url,title}]） */
+    val citations: String = "",
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     val isUser: Boolean get() = role == "user"
@@ -85,6 +87,7 @@ data class Message(
         if (inputTokens > 0) put("inTok", inputTokens)
         if (outputTokens > 0) put("outTok", outputTokens)
         if (serverToolCalls.isNotEmpty()) put("toolCalls", serverToolCalls)
+        if (citations.isNotEmpty()) put("cites", citations)
         put("ts", createdAt)
     }
 
@@ -101,6 +104,7 @@ data class Message(
             inputTokens = o.optInt("inTok", 0),
             outputTokens = o.optInt("outTok", 0),
             serverToolCalls = o.optString("toolCalls", ""),
+            citations = o.optString("cites", ""),
             createdAt = o.optLong("ts", System.currentTimeMillis()),
         )
     }

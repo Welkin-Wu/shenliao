@@ -263,6 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         var inTok = 0
         var outTok = 0
         var toolCalls = ""
+        var citations = ""
         var lastFlush = 0L
 
         fun flush(force: Boolean) {
@@ -272,8 +273,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val c = content.toString()
             val r = reasoning.toString()
             val tc = toolCalls
+            val ct = citations
             patchMessage(convId, assistantId) {
-                it.copy(text = c, reasoning = r, inputTokens = inTok, outputTokens = outTok, serverToolCalls = tc)
+                it.copy(
+                    text = c,
+                    reasoning = r,
+                    inputTokens = inTok,
+                    outputTokens = outTok,
+                    serverToolCalls = tc,
+                    citations = ct,
+                )
             }
         }
 
@@ -286,6 +295,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     onReasoning = { deltas.trySend(Delta(reason = it)) },
                     onUsage = { i, o -> deltas.trySend(Delta(inTok = i, outTok = o)) },
                     onToolCalls = { toolCalls = it },
+                    onCitations = { citations = it },
                 )
             } catch (t: Throwable) {
                 deltas.trySend(Delta(error = describe(t)))
@@ -318,11 +328,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     inputTokens = inTok,
                     outputTokens = outTok,
                     serverToolCalls = toolCalls,
+                    citations = citations,
                 )
             }
         } else if (content.isBlank() && reasoning.isBlank() && !stopped) {
             patchMessage(convId, assistantId) {
-                it.copy(error = "模型没有返回任何内容，可以点重试", serverToolCalls = toolCalls)
+                it.copy(
+                    error = "模型没有返回任何内容，可以点重试",
+                    serverToolCalls = toolCalls,
+                    citations = citations,
+                )
             }
         }
     }

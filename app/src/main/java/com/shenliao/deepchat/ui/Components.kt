@@ -31,7 +31,10 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -103,6 +107,10 @@ fun MessageRow(
             MarkdownText(message.text)
         } else if (streaming && message.reasoning.isBlank()) {
             TypingDots()
+        }
+
+        if (message.citations.isNotBlank()) {
+            CitationBlock(message.citations)
         }
 
         if (message.error != null) {
@@ -188,6 +196,145 @@ fun ThinkingBlock(text: String, streaming: Boolean) {
         }
     }
 }
+
+@Composable
+fun CitationBlock(citationsJson: String) {
+    val items = remember(citationsJson) { parseCitations(citationsJson) }
+    if (items.isEmpty()) return
+
+    var expanded by remember { mutableStateOf(false) }
+    var openedIndex by remember { mutableStateOf(-1) }
+    val uriHandler = LocalUriHandler.current
+
+    Column(
+        modifier = Modifier
+            .padding(top = 10.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppColors.Surface)
+            .padding(vertical = 6.dp, horizontal = 10.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    expanded = !expanded
+                    if (!expanded) openedIndex = -1
+                }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Language,
+                contentDescription = null,
+                tint = AppColors.Primary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "${items.size} 个来源",
+                fontSize = 12.sp,
+                color = AppColors.TextDim,
+            )
+            Spacer(Modifier.weight(1f))
+            Icon(
+                if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = null,
+                tint = AppColors.TextFaint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        if (expanded) {
+            items.forEachIndexed { index, item ->
+                val isOpen = openedIndex == index
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            if (isOpen) {
+                                runCatching { uriHandler.openUri(item.first) }
+                            } else {
+                                openedIndex = index
+                            }
+                        }
+                        .padding(vertical = 7.dp, horizontal = 4.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            text = "${index + 1}",
+                            fontSize = 11.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.width(18.dp),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = item.second.ifBlank { item.first },
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp,
+                                color = AppColors.TextMain,
+                                maxLines = if (isOpen) 4 else 1,
+                            )
+                            Text(
+                                text = hostOf(item.first),
+                                fontSize = 10.sp,
+                                color = AppColors.TextFaint,
+                            )
+                            if (isOpen) {
+                                Text(
+                                    text = item.first,
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
+                                    color = AppColors.TextFaint,
+                                    maxLines = 3,
+                                    modifier = Modifier.padding(top = 3.dp),
+                                )
+                                Text(
+                                    text = "再点一下打开网页",
+                                    fontSize = 10.sp,
+                                    color = AppColors.Primary,
+                                    modifier = Modifier.padding(top = 3.dp),
+                                )
+                            }
+                        }
+                        if (isOpen) {
+                            Icon(
+                                Icons.Outlined.OpenInNew,
+                                contentDescription = null,
+                                tint = AppColors.Primary,
+                                modifier = Modifier
+                                    .padding(start = 4.dp)
+                                    .size(14.dp),
+                            )
+                        }
+                    }
+                }
+                if (index != items.lastIndex) {
+                    HorizontalDivider(color = AppColors.Border.copy(alpha = 0.5f))
+                }
+            }
+        }
+    }
+}
+
+private fun parseCitations(json: String): List<Pair<String, String>> {
+    if (json.isBlank()) return emptyList()
+    return runCatching {
+        val arr = org.json.JSONArray(json)
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val url = o.optString("url", "")
+            if (url.isBlank()) null else url to o.optString("title", "")
+        }
+    }.getOrElse { emptyList() }
+}
+
+private fun hostOf(url: String): String = runCatching {
+    url.substringAfter("://").substringBefore('/').ifBlank { url }
+}.getOrDefault(url)
 
 @Composable
 fun TypingDots() {
