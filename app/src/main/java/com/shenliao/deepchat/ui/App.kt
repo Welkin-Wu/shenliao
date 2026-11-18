@@ -27,6 +27,17 @@ fun AppRoot(vm: AppViewModel) {
 
 @Composable
 private fun AppRootContent(vm: AppViewModel) {
+    // 上次崩过就先给一条自救的路，别一开机就闪退
+    val crash = vm.lastCrash
+    if (crash != null) {
+        CrashScreen(
+            trace = crash,
+            onReset = { vm.factoryReset() },
+            onContinue = { vm.dismissCrash() },
+        )
+        return
+    }
+
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showOnboarding by rememberSaveable { mutableStateOf(!vm.settings.ready) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)

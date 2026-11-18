@@ -24,10 +24,17 @@ class ConversationStore(private val ctx: Context) {
         if (!file.exists()) emptyList()
         else {
             val arr = JSONArray(file.readText())
-            (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let(Conversation::fromJson) }
+            // 逐条解析：某一条坏数据只丢那一条，不至于整个历史都读不出来
+            (0 until arr.length()).mapNotNull { i ->
+                runCatching { arr.optJSONObject(i)?.let(Conversation::fromJson) }.getOrNull()
+            }
         }
     } catch (t: Throwable) {
         emptyList()
+    }
+
+    fun clearCache() {
+        runCatching { ctx.cacheDir.listFiles()?.forEach { it.deleteRecursively() } }
     }
 
     fun save(list: List<Conversation>) {

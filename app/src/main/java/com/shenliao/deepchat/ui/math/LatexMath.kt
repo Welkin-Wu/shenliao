@@ -2,6 +2,7 @@ package com.shenliao.deepchat.ui.math
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -70,11 +71,24 @@ fun LatexMath(
     if (node == null) return
 
     val box = remember(node, sizePx, display, mathFamily) {
-        MathTypesetter(ComposeMeter(measurer, density, mathFamily), sizePx, display).layout(node)
+        runCatching {
+            MathTypesetter(ComposeMeter(measurer, density, mathFamily), sizePx, display).layout(node)
+        }.getOrNull()
     }
 
-    val widthDp = with(density) { box.width.toDp() } + 2.dp
-    val heightDp = with(density) { box.height.toDp() } + 2.dp
+    // 排版失败（极深嵌套 / 栈溢出等）就退回等宽纯文本，绝不让它把界面带崩
+    if (box == null || !box.width.isFinite() || !box.height.isFinite()) {
+        Text(
+            text = latex.trim(),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            color = color,
+        )
+        return
+    }
+
+    val widthDp = with(density) { box.width.coerceIn(0f, 6000f).toDp() } + 2.dp
+    val heightDp = with(density) { box.height.coerceIn(0f, 6000f).toDp() } + 2.dp
 
     Box(
         modifier = modifier

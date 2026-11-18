@@ -7,22 +7,31 @@ class Prefs(ctx: Context) {
 
     private val sp = ctx.getSharedPreferences("deepchat_settings", Context.MODE_PRIVATE)
 
-    fun load(): Settings = Settings(
-        preset = sp.getString("preset", Settings.PRESET_DEEPSEEK) ?: Settings.PRESET_DEEPSEEK,
-        baseUrl = sp.getString("baseUrl", Settings.DEFAULT_BASE_URL) ?: Settings.DEFAULT_BASE_URL,
-        apiKey = sp.getString("apiKey", "") ?: "",
-        model = sp.getString("model", Settings.DEFAULT_MODEL) ?: Settings.DEFAULT_MODEL,
-        systemPrompt = sp.getString("systemPrompt", "") ?: "",
-        thinking = sp.getBoolean("thinking", true),
-        effort = sp.getString("effort", "high") ?: "high",
-        temperature = sp.getFloat("temperature", 0.7f),
-        maxTokens = sp.getInt("maxTokens", 0),
-        docMode = sp.getString("docMode", Settings.DOC_MODE_TEXT) ?: Settings.DOC_MODE_TEXT,
-        webSearch = sp.getBoolean("webSearch", true),
-        readUrl = sp.getBoolean("readUrl", true),
-        mathFont = sp.getString("mathFont", "stix") ?: "stix",
-        themeMode = sp.getString("themeMode", "system") ?: "system",
-    )
+    fun load(): Settings = try {
+        Settings(
+            preset = sp.getString("preset", Settings.PRESET_DEEPSEEK) ?: Settings.PRESET_DEEPSEEK,
+            baseUrl = sp.getString("baseUrl", Settings.DEFAULT_BASE_URL) ?: Settings.DEFAULT_BASE_URL,
+            apiKey = sp.getString("apiKey", "") ?: "",
+            model = sp.getString("model", Settings.DEFAULT_MODEL) ?: Settings.DEFAULT_MODEL,
+            systemPrompt = sp.getString("systemPrompt", "") ?: "",
+            thinking = sp.getBoolean("thinking", true),
+            effort = sp.getString("effort", "high") ?: "high",
+            temperature = sp.getFloat("temperature", 0.7f),
+            maxTokens = sp.getInt("maxTokens", 0),
+            docMode = sp.getString("docMode", Settings.DOC_MODE_TEXT) ?: Settings.DOC_MODE_TEXT,
+            webSearch = sp.getBoolean("webSearch", true),
+            readUrl = sp.getBoolean("readUrl", true),
+            mathFont = sp.getString("mathFont", "stix") ?: "stix",
+            themeMode = sp.getString("themeMode", "system") ?: "system",
+        )
+    } catch (t: Throwable) {
+        // 存档类型对不上（例如旧版本写的是 int、新版按 float 读）时别让 App 起不来
+        Settings()
+    }
+
+    fun reset() {
+        runCatching { sp.edit { clear() } }
+    }
 
     fun save(s: Settings) {
         sp.edit {

@@ -99,6 +99,12 @@ data class LatexParseResult(val node: MNode?, val error: String? = null)
 class LatexParser(private val src: String) {
 
     private var i = 0
+    private var depth = 0
+
+    private fun guardDepth() {
+        depth++
+        if (depth > 80) throw IllegalStateException("公式嵌套太深")
+    }
 
     companion object {
         fun parse(src: String): LatexParseResult {
@@ -186,10 +192,12 @@ class LatexParser(private val src: String) {
     private fun parseGroup(): MNode {
         skipWs()
         if (peek() != '{') return MNode.Empty
+        guardDepth()
         i++ // {
         val body = parseRow(stopAtBrace = true)
         skipWs()
         if (peek() == '}') i++
+        depth--
         return body
     }
 

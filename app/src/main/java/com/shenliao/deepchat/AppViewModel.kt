@@ -54,6 +54,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var pending by mutableStateOf<List<Attachment>>(emptyList())
         private set
 
+    /** 上次启动的崩溃堆栈；非空时界面先显示崩溃恢复页 */
+    var lastCrash by mutableStateOf<String?>(null)
+        private set
+
     private var activeCall: Call? = null
     private var turnJob: Job? = null
     private var stopRequested = false
@@ -62,10 +66,40 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         get() = conversations.firstOrNull { it.id == currentId }
 
     init {
+        lastCrash = readCrash()
         viewModelScope.launch {
             conversations = withContext(Dispatchers.IO) { store.load() }
             currentId = conversations.firstOrNull()?.id
             loaded = true
+        }
+    }
+
+    // ---------------------------------------------------------------- 崩溃恢复
+
+    private fun crashFile(): File = File(File(getApplication<Application>().filesDir, "crash"), "last.txt")
+
+    private fun readCrash(): String? = runCatching {
+        val f = crashFile()
+        if (f.isFile) f.readText().takeIf { it.isNotBlank() } else null
+    }.getOrNull()
+
+    fun dismissCrash() {
+        lastCrash = null
+        runCatching { crashFile().delete() }
+    }
+
+    /** 清空对话 + 设置 + 缓存，用于崩溃后自救 */
+    fun factoryReset() {
+        if (streaming) stop()
+        dismissCrash()
+        conversations = emptyList()
+        currentId = null
+        pending = emptyList()
+        settings = Settings()
+        prefs.reset()
+        viewModelScope.launch(Dispatchers.IO) {
+            store.clearAll()
+            store.clearCache()
         }
     }
 

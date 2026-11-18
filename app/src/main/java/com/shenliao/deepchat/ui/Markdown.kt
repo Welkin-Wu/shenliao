@@ -263,7 +263,9 @@ fun MarkdownText(
     fontSize: TextUnit = 15.sp,
     lineHeight: TextUnit = 23.sp,
 ) {
-    val blocks = remember(text) { parseBlocks(text) }
+    val blocks = remember(text) {
+        runCatching { parseBlocks(text) }.getOrElse { listOf(MdBlock.Paragraph(text)) }
+    }
     val codeStyle = SpanStyle(
         fontFamily = FontFamily.Monospace,
         color = AppColors.CodeAccent,
