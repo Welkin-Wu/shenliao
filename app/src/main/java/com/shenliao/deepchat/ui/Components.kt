@@ -542,7 +542,7 @@ fun ErrorCard(text: String, onRetry: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF2A1519))
+            .background(AppColors.ErrorBg)
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -553,7 +553,7 @@ fun ErrorCard(text: String, onRetry: () -> Unit) {
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(6.dp))
-            Text(text, color = Color(0xFFFFB4B4), fontSize = 13.sp, lineHeight = 19.sp)
+            Text(text, color = AppColors.ErrorText, fontSize = 13.sp, lineHeight = 19.sp)
         }
         TextButton(onClick = onRetry, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp)) {
             Text("重新发送", fontSize = 13.sp, color = AppColors.Primary)

@@ -19,10 +19,8 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         setContent {
-            DeepChatTheme {
-                val vm: AppViewModel = viewModel()
-                AppRoot(vm)
-            }
+            val vm: AppViewModel = viewModel()
+            AppRoot(vm)
         }
     }
 }

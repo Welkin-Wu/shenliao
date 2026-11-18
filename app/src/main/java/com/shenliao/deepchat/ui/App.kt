@@ -1,5 +1,6 @@
 package com.shenliao.deepchat.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
@@ -17,8 +18,10 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun AppRoot(vm: AppViewModel) {
-    CompositionLocalProvider(LocalMathFont provides MathFonts.of(vm.settings.mathFont)) {
-        AppRootContent(vm)
+    DeepChatTheme(mode = vm.settings.themeMode) {
+        CompositionLocalProvider(LocalMathFont provides MathFonts.of(vm.settings.mathFont)) {
+            AppRootContent(vm)
+        }
     }
 }
 
@@ -30,6 +33,8 @@ private fun AppRootContent(vm: AppViewModel) {
     val scope = rememberCoroutineScope()
 
     if (showSettings) {
+        // 系统返回键应该回到聊天页，而不是直接退出 App
+        BackHandler(enabled = true) { showSettings = false }
         SettingsScreen(
             vm = vm,
             onBack = {

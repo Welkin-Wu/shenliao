@@ -21,6 +21,7 @@ class Prefs(ctx: Context) {
         webSearch = sp.getBoolean("webSearch", true),
         readUrl = sp.getBoolean("readUrl", true),
         mathFont = sp.getString("mathFont", "stix") ?: "stix",
+        themeMode = sp.getString("themeMode", "system") ?: "system",
     )
 
     fun save(s: Settings) {
@@ -38,6 +39,7 @@ class Prefs(ctx: Context) {
             putBoolean("webSearch", s.webSearch)
             putBoolean("readUrl", s.readUrl)
             putString("mathFont", s.mathFont)
+            putString("themeMode", s.themeMode)
         }
     }
 }

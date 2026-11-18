@@ -98,6 +98,31 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
+                SectionCard(title = "外观", subtitle = "白天用浅色，夜里用深色；跟随系统会随手机的深色模式切换") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SmallChip(
+                            selected = s.themeMode == THEME_SYSTEM,
+                            onClick = { vm.updateSettings(vm.settings.copy(themeMode = THEME_SYSTEM)) },
+                            icon = Icons.Outlined.Bolt,
+                            label = "跟随系统",
+                        )
+                        SmallChip(
+                            selected = s.themeMode == THEME_LIGHT,
+                            onClick = { vm.updateSettings(vm.settings.copy(themeMode = THEME_LIGHT)) },
+                            icon = Icons.Outlined.Bolt,
+                            label = "浅色",
+                        )
+                        SmallChip(
+                            selected = s.themeMode == THEME_DARK,
+                            onClick = { vm.updateSettings(vm.settings.copy(themeMode = THEME_DARK)) },
+                            icon = Icons.Outlined.Bolt,
+                            label = "深色",
+                        )
+                    }
+                }
+            }
+
+            item {
                 SectionCard(
                     title = "接入方式",
                     subtitle = "请求从这台手机直连你填的地址，不经过任何中转服务器",

@@ -266,7 +266,7 @@ fun MarkdownText(
     val blocks = remember(text) { parseBlocks(text) }
     val codeStyle = SpanStyle(
         fontFamily = FontFamily.Monospace,
-        color = Color(0xFF9FD3FF),
+        color = AppColors.CodeAccent,
         background = AppColors.SurfaceHigh,
     )
     val base = SpanStyle(color = color, fontSize = fontSize)
@@ -327,7 +327,7 @@ fun MarkdownText(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 13.sp,
                             lineHeight = 20.sp,
-                            color = Color(0xFF9FD3FF),
+                            color = AppColors.CodeAccent,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
@@ -426,7 +426,7 @@ fun CodeBlock(lang: String, code: String) {
                     fontFamily = FontFamily.Monospace,
                     fontSize = 13.sp,
                     lineHeight = 20.sp,
-                    color = Color(0xFFD7E3F6),
+                    color = AppColors.CodeText,
                 ),
             )
         }

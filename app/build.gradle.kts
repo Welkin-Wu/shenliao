@@ -13,8 +13,8 @@ android {
         applicationId = "com.shenliao.deepchat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.4.5"
+        versionCode = 12
+        versionName = "1.5.0"
     }
 
     buildTypes {

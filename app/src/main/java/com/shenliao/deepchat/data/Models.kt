@@ -237,6 +237,8 @@ data class Settings(
     val readUrl: Boolean = true,
     /** 公式字体：stix（默认，期刊风）/ lm（LaTeX 教科书风） */
     val mathFont: String = "stix",
+    /** 外观：system 跟随系统 / light 白天 / dark 夜间 */
+    val themeMode: String = "system",
 ) {
     val ready: Boolean get() = apiKey.isNotBlank() && baseUrl.isNotBlank() && model.isNotBlank()
 
