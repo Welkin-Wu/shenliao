@@ -310,6 +310,10 @@ class MathTypesetter(
         else -> d
     }
 
+    /** 把左括号的形状沿竖直中线镜像，得到右括号 */
+    private fun mirrorPts(pts: FloatArray, x: Float, w: Float): FloatArray =
+        FloatArray(pts.size) { i -> if (i % 2 == 0) 2f * x + w - pts[i] else pts[i] }
+
     private fun delimOps(d: String, x: Float, y: Float, w: Float, h: Float, t: Float): List<MOp> {
         val pad = h * 0.06f
         val top = y + pad
@@ -320,47 +324,97 @@ class MathTypesetter(
                 val steps = 12
                 val pts = FloatArray((steps + 1) * 2)
                 for (i in 0..steps) {
-                    val t = i.toFloat() / steps
-                    val y = top + (bottom - top) * t
-                    val bulge = kotlin.math.sin(Math.PI * t).toFloat()
+                    val tStep = i.toFloat() / steps
+                    val yPos = top + (bottom - top) * tStep
+                    val bulge = kotlin.math.sin(Math.PI * tStep).toFloat()
                     val xPos = if (d == "(") x + w - w * bulge else x + w * bulge
                     pts[i * 2] = xPos
-                    pts[i * 2 + 1] = y
+                    pts[i * 2 + 1] = yPos
                 }
                 listOf(MOp.Poly(pts, t))
             }
-            "[" , "]" -> listOf(
+
+            "[" -> listOf(
                 MOp.Poly(floatArrayOf(x + w, top, x + t, top, x + t, bottom, x + w, bottom), t),
             )
-            "{" , "}" -> {
+
+            "]" -> listOf(
+                MOp.Poly(
+                    mirrorPts(floatArrayOf(x + w, top, x + t, top, x + t, bottom, x + w, bottom), x, w),
+                    t,
+                ),
+            )
+
+            "{" -> {
                 val mid = (top + bottom) / 2f
-                val pts = floatArrayOf(
-                    x + w, top,
-                    x + t * 1.5f, top + h * 0.06f,
-                    x + t * 1.5f, mid - h * 0.12f,
-                    x, mid,
-                    x + t * 1.5f, mid + h * 0.12f,
-                    x + t * 1.5f, bottom - h * 0.06f,
-                    x + w, bottom,
+                listOf(
+                    MOp.Poly(
+                        floatArrayOf(
+                            x + w, top,
+                            x + t * 1.5f, top + h * 0.06f,
+                            x + t * 1.5f, mid - h * 0.12f,
+                            x, mid,
+                            x + t * 1.5f, mid + h * 0.12f,
+                            x + t * 1.5f, bottom - h * 0.06f,
+                            x + w, bottom,
+                        ),
+                        t,
+                    ),
                 )
-                listOf(MOp.Poly(pts, t))
             }
+
+            "}" -> {
+                val mid = (top + bottom) / 2f
+                listOf(
+                    MOp.Poly(
+                        mirrorPts(
+                            floatArrayOf(
+                                x + w, top,
+                                x + t * 1.5f, top + h * 0.06f,
+                                x + t * 1.5f, mid - h * 0.12f,
+                                x, mid,
+                                x + t * 1.5f, mid + h * 0.12f,
+                                x + t * 1.5f, bottom - h * 0.06f,
+                                x + w, bottom,
+                            ),
+                            x,
+                            w,
+                        ),
+                        t,
+                    ),
+                )
+            }
+
             "|" -> listOf(MOp.Line(x + w / 2f, top, x + w / 2f, bottom, t))
             "‖" -> listOf(
                 MOp.Line(x + w * 0.25f, top, x + w * 0.25f, bottom, t),
                 MOp.Line(x + w * 0.75f, top, x + w * 0.75f, bottom, t),
             )
-            "⟨" , "⟩" -> listOf(
+
+            "⟨" -> listOf(
                 MOp.Poly(floatArrayOf(x + w, top, x + t, top + h * 0.2f, x + t, bottom - h * 0.2f, x + w, bottom), t),
             )
-            "⌊" , "⌋" -> listOf(
-                if (d == "⌊") MOp.Poly(floatArrayOf(x + w, top, x + t, top, x + t, bottom, x + w, bottom), t)
-                else MOp.Poly(floatArrayOf(x, top, x + w - t, top, x + w - t, bottom, x, bottom), t),
+
+            "⟩" -> listOf(
+                MOp.Poly(
+                    mirrorPts(
+                        floatArrayOf(x + w, top, x + t, top + h * 0.2f, x + t, bottom - h * 0.2f, x + w, bottom),
+                        x,
+                        w,
+                    ),
+                    t,
+                ),
             )
-            "⌈" , "⌉" -> listOf(
-                if (d == "⌈") MOp.Poly(floatArrayOf(x + t, bottom, x + t, top, x + w, top), t)
-                else MOp.Poly(floatArrayOf(x + w - t, bottom, x + w - t, top, x, top), t),
+
+            "⌊" -> listOf(MOp.Poly(floatArrayOf(x + w, top, x + t, top, x + t, bottom, x + w, bottom), t))
+            "⌋" -> listOf(
+                MOp.Poly(
+                    mirrorPts(floatArrayOf(x + w, top, x + t, top, x + t, bottom, x + w, bottom), x, w),
+                    t,
+                ),
             )
+            "⌈" -> listOf(MOp.Poly(floatArrayOf(x + t, bottom, x + t, top, x + w, top), t))
+            "⌉" -> listOf(MOp.Poly(mirrorPts(floatArrayOf(x + t, bottom, x + t, top, x + w, top), x, w), t))
             else -> emptyList()
         }
     }
