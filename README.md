@@ -1,7 +1,8 @@
-# 深聊 · ShenLiao
+# DeepChat
 
 > 把 DeepSeek 装进口袋的 Android 客户端：**带自己的 API Key，对话只留在本机**。
-> 看图、读文档、联网搜索、思考过程实时可见、LaTeX 公式真排版（内置数学字体），12 MB，没有广告也没有后台服务。
+> 看图、读文档、联网搜索、思考过程实时可见、LaTeX 公式真排版（内置数学字体），13 MB，没有广告也没有后台服务。
+> 启动会先画一片海、再画一头鲸，然后直接进新对话。
 
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)

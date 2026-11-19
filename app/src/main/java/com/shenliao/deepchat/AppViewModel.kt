@@ -69,7 +69,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         lastCrash = readCrash()
         viewModelScope.launch {
             conversations = withContext(Dispatchers.IO) { store.load() }
-            currentId = conversations.firstOrNull()?.id
+            // 和 DS 手机端一致：每次启动都落在「新对话」，历史在侧边抽屉里
+            currentId = null
             loaded = true
         }
     }

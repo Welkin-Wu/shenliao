@@ -62,7 +62,7 @@ fun OnboardingScreen(
 
         Spacer(Modifier.height(22.dp))
         Text(
-            "深聊 DeepChat",
+            "DeepChat",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = AppColors.TextMain,

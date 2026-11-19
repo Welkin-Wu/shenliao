@@ -39,9 +39,15 @@ private fun AppRootContent(vm: AppViewModel) {
     }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSplash by rememberSaveable { mutableStateOf(true) }
     var showOnboarding by rememberSaveable { mutableStateOf(!vm.settings.ready) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    if (showSplash) {
+        WhaleSplash(onFinish = { showSplash = false })
+        return
+    }
 
     if (showSettings) {
         // 系统返回键应该回到聊天页，而不是直接退出 App

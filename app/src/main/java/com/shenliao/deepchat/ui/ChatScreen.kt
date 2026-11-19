@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,9 +52,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.shenliao.deepchat.AppViewModel
+import com.shenliao.deepchat.R
 import com.shenliao.deepchat.net.ChatApi
 import java.io.File
 
@@ -180,7 +184,7 @@ fun ChatScreen(
                 title = {
                     Column {
                         Text(
-                            text = conversation?.title ?: "深聊",
+                            text = conversation?.title ?: "DeepChat",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextMain,
@@ -349,22 +353,16 @@ private fun EmptyState(modifier: Modifier = Modifier, onPick: (String) -> Unit) 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
+        Image(
+            painter = painterResource(R.drawable.avatar),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(AppColors.Primary, AppColors.Accent))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Outlined.ChatBubbleOutline,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(34.dp),
-            )
-        }
+                .size(84.dp)
+                .clip(RoundedCornerShape(24.dp)),
+        )
         Spacer(Modifier.height(16.dp))
-        Text("深聊", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMain)
+        Text("DeepChat", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMain)
         Spacer(Modifier.height(6.dp))
         Text(
             text = "把 DeepSeek 装进口袋\n能看图 · 会思考 · 读文档 · 排公式",

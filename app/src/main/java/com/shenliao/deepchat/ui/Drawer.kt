@@ -79,8 +79,8 @@ fun DrawerContent(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text("深聊", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextMain)
-                    Text("DeepChat", fontSize = 11.sp, color = AppColors.TextFaint)
+                    Text("DeepChat", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextMain)
+                    Text("DeepSeek 客户端", fontSize = 11.sp, color = AppColors.TextFaint)
                 }
             }
 

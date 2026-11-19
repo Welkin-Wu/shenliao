@@ -448,7 +448,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             item {
                 SectionCard(title = "关于") {
                     Text(
-                        "深聊 DeepChat 1.0",
+                        "DeepChat 1.6.0",
                         fontSize = 13.sp,
                         color = AppColors.TextMain,
                         fontWeight = FontWeight.Medium,
