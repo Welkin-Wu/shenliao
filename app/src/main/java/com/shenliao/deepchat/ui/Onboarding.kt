@@ -1,5 +1,6 @@
 package com.shenliao.deepchat.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,10 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.shenliao.deepchat.R
 
 @Composable
 fun OnboardingScreen(
@@ -47,15 +51,14 @@ fun OnboardingScreen(
     ) {
         Spacer(Modifier.weight(1f))
 
-        Box(
+        Image(
+            painter = painterResource(R.drawable.avatar),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(84.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Brush.linearGradient(listOf(AppColors.Primary, AppColors.Accent))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("深", color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-        }
+                .size(92.dp)
+                .clip(RoundedCornerShape(26.dp)),
+        )
 
         Spacer(Modifier.height(22.dp))
         Text(

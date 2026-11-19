@@ -1,5 +1,6 @@
 package com.shenliao.deepchat.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,11 +68,14 @@ fun DrawerContent(
                 androidx.compose.foundation.layout.Box(
                     modifier = Modifier
                         .size(34.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Brush.linearGradient(listOf(AppColors.Primary, AppColors.Accent))),
-                    contentAlignment = Alignment.Center,
+                        .clip(RoundedCornerShape(10.dp)),
                 ) {
-                    Text("深", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource(com.shenliao.deepchat.R.drawable.avatar),
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 Spacer(Modifier.width(10.dp))
                 Column {
