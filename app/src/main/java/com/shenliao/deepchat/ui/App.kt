@@ -45,7 +45,7 @@ private fun AppRootContent(vm: AppViewModel) {
     val scope = rememberCoroutineScope()
 
     if (showSplash) {
-        WhaleSplash(onFinish = { showSplash = false })
+        SplashScreen(onFinish = { showSplash = false })
         return
     }
 

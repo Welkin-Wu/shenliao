@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -204,8 +205,8 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = AppColors.TextDim)
+                    IconButton(onClick = { vm.startNewChat() }) {
+                        Icon(Icons.Outlined.AddComment, contentDescription = "新对话", tint = AppColors.TextDim)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Bg),

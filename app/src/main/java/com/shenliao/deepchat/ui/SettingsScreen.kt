@@ -35,6 +35,14 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,6 +69,7 @@ import com.shenliao.deepchat.data.Settings
 @Composable
 fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val s = vm.settings
+    val clipboard = LocalClipboardManager.current
 
     var baseUrl by remember { mutableStateOf(s.baseUrl) }
     var apiKey by remember { mutableStateOf(s.apiKey) }
@@ -446,9 +455,55 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             }
 
             item {
+                SectionCard(
+                    title = "诊断",
+                    subtitle = "闪退后这里会留下堆栈，复制发我就能定位；也可以直接清掉",
+                ) {
+                    val crash = vm.lastCrash
+                    if (crash.isNullOrBlank()) {
+                        Text(
+                            "没有崩溃记录",
+                            fontSize = 13.sp,
+                            color = AppColors.TextDim,
+                        )
+                    } else {
+                        Text(
+                            text = crash.take(1200),
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = AppColors.CodeText,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 220.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(AppColors.CodeBg)
+                                .padding(10.dp)
+                                .verticalScroll(rememberScrollState()),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SmallChip(
+                                selected = false,
+                                onClick = { clipboard.setText(AnnotatedString(crash)) },
+                                icon = Icons.Outlined.ContentCopy,
+                                label = "复制堆栈",
+                            )
+                            SmallChip(
+                                selected = false,
+                                onClick = { vm.dismissCrash() },
+                                icon = Icons.Outlined.DeleteOutline,
+                                label = "清除记录",
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
                 SectionCard(title = "关于") {
                     Text(
-                        "DeepChat 1.6.0",
+                        "DeepChat 1.6.1",
                         fontSize = 13.sp,
                         color = AppColors.TextMain,
                         fontWeight = FontWeight.Medium,
