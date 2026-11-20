@@ -243,6 +243,8 @@ data class Settings(
     val withTime: Boolean = true,
     /** 附带大概位置（需权限，城市级精度） */
     val withLocation: Boolean = false,
+    /** 是否已经问过定位权限，避免每次启动都弹 */
+    val askedLocation: Boolean = false,
 ) {
     val ready: Boolean get() = apiKey.isNotBlank() && baseUrl.isNotBlank() && model.isNotBlank()
 

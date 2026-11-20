@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
@@ -106,7 +107,7 @@ fun DrawerContent(
                     .padding(horizontal = 12.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.AddComment, null, tint = AppColors.Primary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.AddCircleOutline, null, tint = AppColors.Primary, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("新对话", fontSize = 14.sp, color = AppColors.Primary, fontWeight = FontWeight.Medium)
             }
@@ -131,17 +132,32 @@ fun DrawerContent(
                 )
                 Spacer(Modifier.width(8.dp))
                 Box(Modifier.weight(1f)) {
-                    if (query.isEmpty()) {
-                        Text("搜索对话内容", fontSize = 13.sp, color = AppColors.TextFaint)
-                    }
+                    // 占位文字放进 decorationBox，和输入文字共用同一套行高，光标才不会偏
                     BasicTextField(
                         value = query,
                         onValueChange = { query = it },
-                        textStyle = TextStyle(fontSize = 13.sp, color = AppColors.TextMain),
+                        textStyle = TextStyle(
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = AppColors.TextMain,
+                        ),
                         singleLine = true,
                         cursorBrush = SolidColor(AppColors.Primary),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (query.isEmpty()) {
+                                    Text(
+                                        text = "搜索对话内容",
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp,
+                                        color = AppColors.TextFaint,
+                                    )
+                                }
+                                inner()
+                            }
+                        },
                     )
                 }
                 if (query.isNotEmpty()) {

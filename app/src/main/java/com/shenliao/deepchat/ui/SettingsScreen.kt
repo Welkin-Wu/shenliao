@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -414,6 +415,15 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                             }
                         },
                     )
+                    if (!locationGranted) {
+                        Spacer(Modifier.height(10.dp))
+                        SmallChip(
+                            selected = false,
+                            onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                            icon = Icons.Outlined.Place,
+                            label = "申请定位权限",
+                        )
+                    }
                 }
             }
 
