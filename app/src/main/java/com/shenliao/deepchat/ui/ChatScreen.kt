@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +46,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -168,16 +171,30 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val attachmentsBusy = vm.pending.any { it.busy }
 
+    // 生成时是否跟着往下走：用户手动往上翻就停止跟随，滑回底部再自动恢复
+    var follow by remember { mutableStateOf(true) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress to listState.canScrollForward }
+            .collect { (scrolling, canScrollForward) ->
+                if (scrolling && canScrollForward) follow = false
+                if (!canScrollForward) follow = true
+            }
+    }
+
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+        if (messages.isEmpty()) return@LaunchedEffect
+        if (!follow) return@LaunchedEffect
+        withFrameNanos { }
+        listState.scrollToBottom()
     }
 
     val lastLength = messages.lastOrNull()?.body?.length ?: 0
     LaunchedEffect(lastLength) {
-        if (!vm.streaming || messages.isEmpty()) return@LaunchedEffect
-        val info = listState.layoutInfo
-        val atBottom = info.visibleItemsInfo.lastOrNull()?.index?.let { it >= messages.size - 1 } ?: true
-        if (atBottom) listState.scrollToItem(messages.size - 1)
+        // 流式输出时按增量往下推：只补「超出视口」的那一段，
+        // 不能用 scrollToItem(最后一条)——那会把最后一条的顶部对齐屏幕顶部，看起来像跳回第一行
+        if (!vm.streaming || messages.isEmpty() || !follow) return@LaunchedEffect
+        withFrameNanos { }
+        listState.scrollToBottom()
     }
 
     Scaffold(
@@ -402,4 +419,12 @@ private fun EmptyState(modifier: Modifier = Modifier, onPick: (String) -> Unit) 
         )
         Spacer(Modifier.height(4.dp))
     }
+}
+
+/** 把列表推到底：只补超出视口的那一段，不改变当前阅读位置 */
+private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollToBottom() {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return
+    val overflow = (last.offset + last.size) - info.viewportEndOffset
+    if (overflow > 0) scrollBy(overflow.toFloat())
 }
