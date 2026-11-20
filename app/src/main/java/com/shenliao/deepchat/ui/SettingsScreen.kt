@@ -63,6 +63,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.runtime.rememberCoroutineScope
+import android.content.Intent
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.shenliao.deepchat.net.Updater
 import com.shenliao.deepchat.AppViewModel
 import com.shenliao.deepchat.data.Settings
 
@@ -71,6 +80,16 @@ import com.shenliao.deepchat.data.Settings
 fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val s = vm.settings
     val clipboard = LocalClipboardManager.current
+    val versionContext = androidx.compose.ui.platform.LocalContext.current
+    val versionName = remember {
+        runCatching {
+            versionContext.packageManager.getPackageInfo(versionContext.packageName, 0).versionName ?: "?"
+        }.getOrDefault("?")
+    }
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var update by remember { mutableStateOf<com.shenliao.deepchat.net.Updater.Release?>(null) }
+    var updateMsg by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val hasLocation = remember {
         context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
@@ -559,7 +578,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             item {
                 SectionCard(title = "关于") {
                     Text(
-                        "DeepChat 1.6.1",
+                        "DeepChat $versionName",
                         fontSize = 13.sp,
                         color = AppColors.TextMain,
                         fontWeight = FontWeight.Medium,
@@ -571,6 +590,76 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                         lineHeight = 19.sp,
                         color = AppColors.TextDim,
                     )
+
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SmallChip(
+                            selected = false,
+                            onClick = {
+                                if (!checking) {
+                                    checking = true
+                                    updateMsg = null
+                                    update = null
+                                    scope.launch {
+                                        val release = withContext(Dispatchers.IO) { Updater.checkLatest() }
+                                        checking = false
+                                        update = release
+                                        updateMsg = when {
+                                            release == null ->
+                                                "没取到发布信息（仓库可能还没发布版本，或网络不通）"
+                                            else -> {
+                                                val cmp = Updater.compareVersions(versionName, release.tag)
+                                                when {
+                                                    cmp == null -> "最新版本 ${release.tag}"
+                                                    cmp < 0 -> "发现新版本 ${release.tag}，当前 $versionName"
+                                                    else -> "已是最新版本（${release.tag}）"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            icon = Icons.Outlined.Refresh,
+                            label = if (checking) "检查中…" else "检查更新",
+                        )
+                        if (update != null) {
+                            Spacer(Modifier.width(8.dp))
+                            SmallChip(
+                                selected = false,
+                                onClick = {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(update!!.url)),
+                                        )
+                                    }
+                                },
+                                icon = Icons.Outlined.OpenInNew,
+                                label = "打开发布页",
+                            )
+                        }
+                    }
+                    updateMsg?.let { msg ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(msg, fontSize = 12.sp, lineHeight = 18.sp, color = AppColors.TextDim)
+                    }
+                    update?.let { release ->
+                        if (release.notes.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = release.notes.take(1600),
+                                fontSize = 11.sp,
+                                lineHeight = 17.sp,
+                                color = AppColors.CodeText,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 240.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(AppColors.CodeBg)
+                                    .padding(10.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            )
+                        }
+                    }
                 }
             }
         }

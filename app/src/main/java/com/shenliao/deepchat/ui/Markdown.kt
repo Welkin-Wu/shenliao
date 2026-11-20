@@ -274,7 +274,7 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     color: Color = AppColors.TextMain,
     fontSize: TextUnit = 15.sp,
-    lineHeight: TextUnit = 23.sp,
+    lineHeight: TextUnit = 25.sp,
 ) {
     val blocks = remember(text) {
         runCatching { parseBlocks(text) }.getOrElse { listOf(MdBlock.Paragraph(text)) }
@@ -288,7 +288,8 @@ fun MarkdownText(
 
     Column(modifier = modifier.fillMaxWidth()) {
         blocks.forEachIndexed { index, block ->
-            if (index > 0) Spacer(Modifier.height(9.dp))
+            // 块之间留足呼吸感：官方那种「段距明显、公式独占一行」的观感就靠这里
+            if (index > 0) Spacer(Modifier.height(if (block is MdBlock.Heading) 16.dp else 11.dp))
             when (block) {
                 is MdBlock.Paragraph -> Text(
                     text = inlineAnnotated(block.text, base, AppColors.Primary, codeStyle),
@@ -312,7 +313,7 @@ fun MarkdownText(
                         ),
                         style = TextStyle(
                             fontSize = size,
-                            lineHeight = (size.value + 9).sp,
+                            lineHeight = (size.value + 12).sp,
                             color = color,
                             fontWeight = FontWeight.Bold,
                         ),
@@ -326,17 +327,21 @@ fun MarkdownText(
 
                 is MdBlock.Math -> {
                     if (canTypesetLatex(block.latex)) {
+                        // 块级公式独占一行、居中、上下留白
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
+                                .padding(vertical = 9.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            LatexMath(
-                                latex = block.latex,
-                                fontSize = (fontSize.value + 2).sp,
-                                color = color,
-                                display = true,
-                            )
+                            Box(Modifier.horizontalScroll(rememberScrollState())) {
+                                LatexMath(
+                                    latex = block.latex,
+                                    fontSize = (fontSize.value + 2).sp,
+                                    color = color,
+                                    display = true,
+                                )
+                            }
                         }
                     } else {
                         Text(
@@ -347,12 +352,13 @@ fun MarkdownText(
                             color = AppColors.CodeAccent,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(vertical = 6.dp)
                                 .horizontalScroll(rememberScrollState()),
                         )
                     }
                 }
 
-                is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     block.items.forEachIndexed { i, item ->
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Text(
