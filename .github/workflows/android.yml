@@ -3,11 +3,19 @@ name: Build APK
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - 'dist/**'
+      - '**/*.md'
   workflow_dispatch:
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -17,17 +25,68 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Environment info
+        run: |
+          set -x
+          java -version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls "$ANDROID_HOME" || true
+          ls "$ANDROID_HOME/platforms" || true
+          ls "$ANDROID_HOME/build-tools" || true
+          which gradle || true
+          gradle --version || true
+
+      - name: Ensure Android SDK packages
+        run: |
+          set -o pipefail
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          if [ -z "$SDK" ]; then
+            echo "no ANDROID_HOME, installing cmdline-tools manually"
+            SDK="$HOME/android-sdk"
+            mkdir -p "$SDK/cmdline-tools"
+            curl -sSLo /tmp/cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q /tmp/cmdline.zip -d "$SDK/cmdline-tools"
+            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+            echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          fi
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SM" ] || SM="$(command -v sdkmanager || true)"
+          echo "sdkmanager=$SM"
+          if [ -n "$SM" ]; then
+            yes | "$SM" --licenses > /dev/null 2>&1 || true
+            "$SM" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" 2>&1 | tail -20 || true
+            "$SM" --list_installed 2>&1 | tail -20 || true
+          fi
 
       - name: Build release APK
         run: |
+          set -o pipefail
           chmod +x gradlew || true
-          ./gradlew assembleRelease --stacktrace --console=plain
+          if ./gradlew --version > /dev/null 2>&1; then
+            echo "== using gradle wrapper =="
+            ./gradlew assembleRelease --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
+          else
+            echo "== wrapper unavailable, falling back to system gradle =="
+            gradle --version || true
+            gradle assembleRelease --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
+          fi
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: shenliao-apk
+          name: deepchat-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            build.log
+            app/build/reports/**
+          if-no-files-found: warn
