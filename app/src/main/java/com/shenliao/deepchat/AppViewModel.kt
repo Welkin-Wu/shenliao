@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -42,8 +43,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var currentId by mutableStateOf<String?>(null)
         private set
 
-    var streaming by mutableStateOf(false)
-        private set
+    /** 当前会话是否正在生成；每个会话各有一条独立的流，切走不打断 */
+    val streaming: Boolean
+        get() = currentId?.let { streamingConversations[it] == true } ?: false
+
+    fun isStreaming(convId: String?): Boolean =
+        convId != null && streamingConversations[convId] == true
 
     var settings by mutableStateOf(prefs.load())
         private set
@@ -58,9 +63,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var lastCrash by mutableStateOf<String?>(null)
         private set
 
-    private var activeCall: Call? = null
-    private var turnJob: Job? = null
-    private var stopRequested = false
+    /** 每个会话一条独立的流：切走、开新对话都不会打断之前的生成 */
+    private val streamingConversations = mutableStateMapOf<String, Boolean>()
+    private val activeCalls = mutableMapOf<String, Call>()
+    private val stopping = mutableSetOf<String>()
 
     val current: Conversation?
         get() = conversations.firstOrNull { it.id == currentId }
@@ -95,7 +101,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 清空对话 + 设置 + 缓存，用于崩溃后自救 */
     fun factoryReset() {
-        if (streaming) stop()
+        stopAll()
         dismissCrash()
         conversations = emptyList()
         currentId = null
@@ -111,12 +117,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------------------------------------------------------- 会话管理
 
     fun startNewChat() {
-        if (streaming) stop()
+        // 不打断其它会话的生成，和官方手机端一致
         currentId = null
     }
 
     fun openConversation(id: String) {
-        if (streaming) stop()
         currentId = id
     }
 
@@ -134,7 +139,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearAllConversations() {
-        if (streaming) stop()
+        stopAll()
         conversations = emptyList()
         currentId = null
         pending = emptyList()
@@ -218,7 +223,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------------------------------------------------------- 发消息
 
     fun send(rawText: String) {
-        if (streaming) return
+        if (isStreaming(currentId)) return
         if (!settings.ready) return
         val trimmed = rawText.trim()
         val atts = pending
@@ -227,9 +232,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         pending = emptyList()
 
         val existing = current
-        turnJob = viewModelScope.launch {
-            streaming = true
-            stopRequested = false
+        viewModelScope.launch {
+            var runningConvId: String? = null
             try {
                 val userMsg = Message(role = "user", text = trimmed, attachments = atts)
                 val assistant = Message(role = "assistant", replies = listOf(Reply()))
@@ -245,18 +249,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     conversations.map { if (it.id == updated.id) updated else it }
                 }
                 currentId = updated.id
+                runningConvId = updated.id
+                streamingConversations[updated.id] = true
                 executeTurn(updated.id, assistant.id, 0)
                 persist()
             } finally {
-                streaming = false
-                activeCall = null
+                runningConvId?.let { streamingConversations.remove(it); activeCalls.remove(it) }
             }
         }
     }
 
     /** 再生成一个候选回答（左右箭头切换） */
     fun regenerate(messageId: String) {
-        if (streaming) return
+        if (isStreaming(currentId)) return
         val conv = current ?: return
         val target = conv.messages.firstOrNull { it.id == messageId } ?: return
         if (target.isUser) return
@@ -274,15 +279,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         conversations = conversations.map { if (it.id == updated.id) updated else it }
 
-        turnJob = viewModelScope.launch {
-            streaming = true
-            stopRequested = false
+        viewModelScope.launch {
             try {
+                streamingConversations[updated.id] = true
                 executeTurn(updated.id, messageId, newIndex)
                 persist()
             } finally {
-                streaming = false
-                activeCall = null
+                streamingConversations.remove(updated.id)
+                activeCalls.remove(updated.id)
             }
         }
     }
@@ -308,7 +312,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 编辑一条用户消息，并从这条开始重新生成 */
     fun editAndResend(messageId: String, newText: String) {
-        if (streaming) return
+        if (isStreaming(currentId)) return
         val conv = current ?: return
         val idx = conv.messages.indexOfFirst { it.id == messageId }
         if (idx < 0 || !conv.messages[idx].isUser) return
@@ -325,22 +329,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         conversations = conversations.map { if (it.id == updated.id) updated else it }
 
-        turnJob = viewModelScope.launch {
-            streaming = true
-            stopRequested = false
+        viewModelScope.launch {
             try {
+                streamingConversations[updated.id] = true
                 executeTurn(updated.id, assistant.id, 0)
                 persist()
             } finally {
-                streaming = false
-                activeCall = null
+                streamingConversations.remove(updated.id)
+                activeCalls.remove(updated.id)
             }
         }
     }
 
+    /** 停掉所有正在生成的会话 */
+    fun stopAll() {
+        stopping.addAll(activeCalls.keys)
+        activeCalls.values.forEach { runCatching { it.cancel() } }
+    }
+
+    /** 只停当前会话；其它会话继续生成 */
     fun stop() {
-        stopRequested = true
-        runCatching { activeCall?.cancel() }
+        val id = currentId ?: return
+        stopping += id
+        runCatching { activeCalls[id]?.cancel() }
     }
 
     private suspend fun executeTurn(convId: String, assistantId: String, replyIndex: Int) {
@@ -365,7 +376,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             patchReply(convId, assistantId, replyIndex) { it.copy(error = "地址不合法：${t.message ?: ""}") }
             return
         }
-        activeCall = call
+        activeCalls[convId] = call
 
         val content = StringBuilder()
         val reasoning = StringBuilder()
@@ -414,18 +425,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         var errMsg: String? = null
-        for (d in deltas) {
-            d.content?.let { content.append(it) }
-            d.reason?.let { reasoning.append(it) }
-            d.inTok?.let { inTok = it }
-            d.outTok?.let { outTok = it }
-            d.error?.let { if (errMsg == null) errMsg = it }
-            flush(false)
+        var stalled = false
+        var lastDataAt = SystemClock.uptimeMillis()
+        // 读超时已经在 OkHttp 层关掉了，这里做「多久没数据」的看门狗
+        val watchdog = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5_000)
+                if (SystemClock.uptimeMillis() - lastDataAt > 150_000L) {
+                    stalled = true
+                    runCatching { call.cancel() }
+                    deltas.close()
+                    break
+                }
+            }
         }
+        try {
+            for (d in deltas) {
+                lastDataAt = SystemClock.uptimeMillis()
+                d.content?.let { content.append(it) }
+                d.reason?.let { reasoning.append(it) }
+                d.inTok?.let { inTok = it }
+                d.outTok?.let { outTok = it }
+                d.error?.let { if (errMsg == null) errMsg = it }
+                flush(false)
+            }
+        } finally {
+            watchdog.cancel()
+        }
+        if (stalled) errMsg = "连接超过 150 秒没有任何数据，已断开（网络可能不稳，重试即可）"
         flush(true)
 
-        val stopped = stopRequested
-        stopRequested = false
+        val stopped = stopping.remove(convId)
         val error = errMsg
 
         // 引用兜底：① 正文里的链接 → ② 用模型真实用过的搜索词再搜一次

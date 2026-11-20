@@ -30,6 +30,16 @@ object ChatApi {
         .retryOnConnectionFailure(true)
         .build()
 
+    /**
+     * 流式对话专用：长思考可能连续几分钟，OkHttp 的 readTimeout 卡的是「两次收到数据之间」，
+     * 一旦模型在服务端排队/思考停顿超过 180 秒就会被误判成超时。这里直接关掉读超时，
+     * 由上层自己看「多久没有新数据」来决定是否断开。
+     */
+    private val streamClient: OkHttpClient = client.newBuilder()
+        .readTimeout(0, TimeUnit.SECONDS)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .build()
+
     /** 允许用户填 https://api.deepseek.com 或 .../v1 之类，统一拼到 chat/completions。 */
     fun endpointOf(baseUrl: String): String {
         val b = baseUrl.trim().trimEnd('/')
@@ -54,6 +64,8 @@ object ChatApi {
             client.newBuilder()
                 .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
                 .build()
+        } else if (stream) {
+            streamClient
         } else {
             client
         }

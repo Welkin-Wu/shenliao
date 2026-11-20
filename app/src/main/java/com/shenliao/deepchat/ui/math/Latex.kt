@@ -190,8 +190,14 @@ class LatexParser(private val src: String) {
         return if (peek() == '{') parseGroup() else (parseAtom() ?: MNode.Empty)
     }
 
-    private fun parseGroup(): MNode {
+    /** 重音/根号的参数：{..} 或紧跟的一个原子（\bar\psi 这种没写花括号的写法很常见） */
+    private fun parseAccentArg(): MNode {
         skipWs()
+        if (i >= src.length) return MNode.Empty
+        if (src[i] == '{') return parseGroup()
+        return parseAtom() ?: MNode.Empty
+    }
+    private fun parseGroup(): MNode {        skipWs()
         if (peek() != '{') return MNode.Empty
         guardDepth()
         i++ // {
@@ -335,12 +341,13 @@ class LatexParser(private val src: String) {
             name == "mathit" || name == "mathcal" || name == "mathfrak" ->
                 MNode.TextRun(readRawGroup())
 
-            name == "overline" || name == "bar" -> MNode.Accent(parseGroup(), MAccent.BAR)
-            name == "underline" -> MNode.Accent(parseGroup(), MAccent.BAR)
-            name == "hat" || name == "widehat" -> MNode.Accent(parseGroup(), MAccent.HAT)
-            name == "vec" || name == "overrightarrow" -> MNode.Accent(parseGroup(), MAccent.VEC)
-            name == "tilde" || name == "widetilde" -> MNode.Accent(parseGroup(), MAccent.TILDE)
-            name == "dot" -> MNode.Accent(parseGroup(), MAccent.DOT)
+            // 重音参数既可以是 {..} 也可以是紧跟的一个原子：\bar\psi 和 \bar{\psi} 等价
+            name == "overline" || name == "bar" -> MNode.Accent(parseAccentArg(), MAccent.BAR)
+            name == "underline" -> MNode.Accent(parseAccentArg(), MAccent.BAR)
+            name == "hat" || name == "widehat" -> MNode.Accent(parseAccentArg(), MAccent.HAT)
+            name == "vec" || name == "overrightarrow" -> MNode.Accent(parseAccentArg(), MAccent.VEC)
+            name == "tilde" || name == "widetilde" -> MNode.Accent(parseAccentArg(), MAccent.TILDE)
+            name == "dot" -> MNode.Accent(parseAccentArg(), MAccent.DOT)
 
             name == "left" -> parseDelimited()
             name == "right" -> {
