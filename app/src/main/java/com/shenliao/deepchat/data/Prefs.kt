@@ -23,6 +23,8 @@ class Prefs(ctx: Context) {
             readUrl = sp.getBoolean("readUrl", true),
             mathFont = sp.getString("mathFont", "stix") ?: "stix",
             themeMode = sp.getString("themeMode", "system") ?: "system",
+            withTime = sp.getBoolean("withTime", true),
+            withLocation = sp.getBoolean("withLocation", false),
         )
     } catch (t: Throwable) {
         // 存档类型对不上（例如旧版本写的是 int、新版按 float 读）时别让 App 起不来
@@ -49,6 +51,8 @@ class Prefs(ctx: Context) {
             putBoolean("readUrl", s.readUrl)
             putString("mathFont", s.mathFont)
             putString("themeMode", s.themeMode)
+            putBoolean("withTime", s.withTime)
+            putBoolean("withLocation", s.withLocation)
         }
     }
 }

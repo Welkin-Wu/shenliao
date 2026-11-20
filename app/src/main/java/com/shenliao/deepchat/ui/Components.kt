@@ -228,7 +228,7 @@ private fun UserBubble(message: Message, onEdit: (String) -> Unit) {
             Row(
                 modifier = Modifier
                     .padding(top = 2.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .clickable { editing = true }
                     .padding(horizontal = 6.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -314,7 +314,7 @@ fun ThinkingBlock(text: String, streaming: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(AppColors.Surface.copy(alpha = 0.75f))
             .clickable { expanded = !expanded }
             .padding(horizontal = 12.dp, vertical = 9.dp),
@@ -374,14 +374,14 @@ fun CitationBlock(citationsJson: String, source: String = "") {
         modifier = Modifier
             .padding(top = 10.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(AppColors.Surface)
             .padding(vertical = 6.dp, horizontal = 10.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .clickable {
                     expanded = !expanded
                     if (!expanded) openedIndex = -1
@@ -426,7 +426,7 @@ fun CitationBlock(citationsJson: String, source: String = "") {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 2.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable {
                             if (isOpen) {
                                 runCatching { uriHandler.openUri(item.first) }
@@ -541,7 +541,7 @@ fun ErrorCard(text: String, onRetry: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(AppColors.ErrorBg)
             .padding(12.dp),
     ) {
@@ -573,7 +573,7 @@ fun AttachmentStrip(attachments: List<Attachment>) {
             Row(
                 modifier = Modifier
                     .padding(bottom = 4.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(AppColors.Surface)
                     .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -605,7 +605,7 @@ fun AttachmentStrip(attachments: List<Attachment>) {
                     Box(
                         modifier = Modifier
                             .size(96.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(AppColors.SurfaceHigh)
                             .clickable { preview = att },
                         contentAlignment = Alignment.Center,
@@ -637,7 +637,7 @@ fun AttachmentStrip(attachments: List<Attachment>) {
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp)),
+                            .clip(RoundedCornerShape(20.dp)),
                     )
                 }
             }

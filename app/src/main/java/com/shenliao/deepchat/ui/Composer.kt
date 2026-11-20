@@ -156,7 +156,7 @@ fun Composer(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("问点什么…", color = AppColors.TextFaint, fontSize = 15.sp) },
                 maxLines = 6,
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(28.dp),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, lineHeight = 22.sp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = AppColors.Surface,
@@ -236,7 +236,7 @@ private fun PendingImage(att: Attachment, onRemove: () -> Unit) {
     Box(
         modifier = Modifier
             .size(62.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(AppColors.SurfaceHigh),
     ) {
         if (bitmap != null) {
@@ -261,9 +261,9 @@ private fun PendingDoc(att: Attachment, onRemove: () -> Unit) {
     Row(
         modifier = Modifier
             .widthIn(max = 220.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(AppColors.Surface)
-            .border(1.dp, AppColors.Border, RoundedCornerShape(12.dp))
+            .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
             .padding(start = 10.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

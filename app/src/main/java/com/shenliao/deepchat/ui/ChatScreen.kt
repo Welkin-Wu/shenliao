@@ -33,6 +33,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.AddComment
+import java.util.Calendar
+import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -205,8 +207,21 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { vm.startNewChat() }) {
-                        Icon(Icons.Outlined.AddComment, contentDescription = "新对话", tint = AppColors.TextDim)
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(AppColors.Surface)
+                            .clickable { vm.startNewChat() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.AddCircleOutline,
+                            contentDescription = "新对话",
+                            tint = AppColors.TextMain,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Bg),
@@ -339,18 +354,26 @@ private fun guessMime(name: String): String {
 
 @Composable
 private fun EmptyState(modifier: Modifier = Modifier, onPick: (String) -> Unit) {
-    val suggestions = listOf(
-        "用三句话讲清楚 MoE 混合专家架构",
-        "把这段文字改得更适合发朋友圈：",
-        "写一个 Python 快速排序，并说明复杂度",
-        "帮我把这份 PPT 的要点整理成一页纸",
-    )
+    // 和官方手机端一样：一个小图标 + 一句按时间变化的问候
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val greeting = when (hour) {
+        in 5..8 -> "早上好"
+        in 9..11 -> "上午好"
+        in 12..13 -> "中午好"
+        in 14..17 -> "下午好"
+        in 18..22 -> "晚上好"
+        else -> "夜深了"
+    }
+    val tail = when (hour) {
+        in 5..17 -> "开始聊天吧"
+        in 18..22 -> "想问点什么"
+        else -> "还不睡吗"
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 26.dp, vertical = 24.dp),
+            .padding(horizontal = 26.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -359,40 +382,24 @@ private fun EmptyState(modifier: Modifier = Modifier, onPick: (String) -> Unit) 
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(84.dp)
-                .clip(RoundedCornerShape(24.dp)),
+                .size(52.dp)
+                .clip(RoundedCornerShape(16.dp)),
         )
-        Spacer(Modifier.height(16.dp))
-        Text("DeepChat", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMain)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(18.dp))
         Text(
-            text = "把 DeepSeek 装进口袋\n能看图 · 会思考 · 读文档 · 排公式",
-            fontSize = 13.sp,
-            lineHeight = 20.sp,
-            color = AppColors.TextDim,
+            text = "$greeting，$tail",
+            fontSize = 21.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AppColors.TextMain,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(26.dp))
-        suggestions.forEach { s ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(AppColors.Surface)
-                    .clickable { onPick(s) }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = s,
-                    fontSize = 13.sp,
-                    color = AppColors.TextDim,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("↗", fontSize = 13.sp, color = AppColors.TextFaint)
-            }
-        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "能看图 · 会思考 · 读文档 · 排公式",
+            fontSize = 12.sp,
+            color = AppColors.TextFaint,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(4.dp))
     }
 }

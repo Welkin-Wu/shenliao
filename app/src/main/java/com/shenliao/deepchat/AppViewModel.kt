@@ -67,6 +67,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         lastCrash = readCrash()
+        // 开了「附带大概位置」就在启动时抓一次定位，请求时直接用缓存
+        if (settings.withLocation) {
+            runCatching { com.shenliao.deepchat.util.RuntimeContext.refreshLocation(getApplication()) {} }
+        }
         viewModelScope.launch {
             conversations = withContext(Dispatchers.IO) { store.load() }
             // 和 DS 手机端一致：每次启动都落在「新对话」，历史在侧边抽屉里
@@ -345,7 +349,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val stopIndex = conv.messages.indexOfFirst { it.id == assistantId }
         val history = if (stopIndex >= 0) conv.messages.subList(0, stopIndex).toList() else conv.messages
 
-        val body = ChatApi.buildBody(settings, history, stream = true)
+        val body = ChatApi.buildBody(
+            settings,
+            history,
+            stream = true,
+            context = com.shenliao.deepchat.util.RuntimeContext.build(
+                getApplication(),
+                settings.withTime,
+                settings.withLocation,
+            ),
+        )
         val call = try {
             ChatApi.newCall(body, settings, stream = true)
         } catch (t: Throwable) {

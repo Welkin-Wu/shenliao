@@ -27,6 +27,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,6 +66,8 @@ fun DrawerContent(
     onOpenSettings: () -> Unit,
 ) {
     var pendingDelete by remember { mutableStateOf<Conversation?>(null) }
+    var query by remember { mutableStateOf("") }
+    val hits = remember(conversations, query) { searchHits(conversations, query) }
 
     ModalDrawerSheet(drawerContainerColor = AppColors.Surface) {
         Column(Modifier.fillMaxHeight()) {
@@ -101,9 +113,55 @@ fun DrawerContent(
 
             Spacer(Modifier.height(10.dp))
 
-            if (conversations.isEmpty()) {
+            // 搜索历史：标题和每条消息内容都进索引
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppColors.SurfaceHigh)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = AppColors.TextFaint,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) {
+                        Text("搜索对话内容", fontSize = 13.sp, color = AppColors.TextFaint)
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        textStyle = TextStyle(fontSize = 13.sp, color = AppColors.TextMain),
+                        singleLine = true,
+                        cursorBrush = SolidColor(AppColors.Primary),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "清空",
+                        tint = AppColors.TextFaint,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .clickable { query = "" },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            if (hits.isEmpty()) {
                 Text(
-                    text = "还没有对话记录",
+                    text = if (conversations.isEmpty()) "还没有对话记录" else "没有匹配的对话",
                     fontSize = 12.sp,
                     color = AppColors.TextFaint,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
@@ -117,7 +175,9 @@ fun DrawerContent(
                     ),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(conversations, key = { it.id }) { conv ->
+                    items(hits, key = { it.first.id }) { hit ->
+                        val conv = hit.first
+                        val snippet = hit.second
                         val selected = conv.id == currentId
                         Row(
                             modifier = Modifier
@@ -135,6 +195,15 @@ fun DrawerContent(
                                     color = if (selected) AppColors.TextMain else AppColors.TextDim,
                                     maxLines = 1,
                                 )
+                                if (snippet != null) {
+                                    Text(
+                                        text = "…$snippet…",
+                                        fontSize = 11.sp,
+                                        color = AppColors.Primary.copy(alpha = 0.8f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                                 Text(
                                     text = relativeTime(conv.updatedAt),
                                     fontSize = 10.sp,
@@ -202,5 +271,30 @@ fun relativeTime(ts: Long): String {
         diff < 86_400_000L -> "${diff / 3_600_000L} 小时前"
         diff < 7 * 86_400_000L -> "${diff / 86_400_000L} 天前"
         else -> SimpleDateFormat("MM-dd", Locale.getDefault()).format(Date(ts))
+    }
+}
+
+/** 标题 + 所有消息/回答内容都进索引，命中时给一段上下文片段 */
+private fun searchHits(conversations: List<Conversation>, rawQuery: String): List<Pair<Conversation, String?>> {
+    val key = rawQuery.trim()
+    if (key.isEmpty()) return conversations.map { it to null }
+    return conversations.mapNotNull { conv ->
+        val titleHit = conv.title.contains(key, ignoreCase = true)
+        val body = buildString {
+            conv.messages.forEach { m ->
+                if (m.text.isNotBlank()) append(m.text).append('\n')
+                m.replies.forEach { r -> if (r.text.isNotBlank()) append(r.text).append('\n') }
+            }
+        }
+        if (!titleHit && !body.contains(key, ignoreCase = true)) return@mapNotNull null
+        val idx = body.indexOf(key, ignoreCase = true)
+        val snippet = if (idx >= 0) {
+            val from = (idx - 12).coerceAtLeast(0)
+            val to = (idx + key.length + 26).coerceAtMost(body.length)
+            body.substring(from, to).replace('\n', ' ').trim()
+        } else {
+            null
+        }
+        conv to snippet
     }
 }

@@ -129,14 +129,25 @@ object ChatApi {
     }
 
     /** 构造请求体。history 里不应包含正在生成的占位消息。 */
-    fun buildBody(settings: Settings, history: List<Message>, stream: Boolean): JSONObject {
+    fun buildBody(
+        settings: Settings,
+        history: List<Message>,
+        stream: Boolean,
+        context: String? = null,
+    ): JSONObject {
         val messages = JSONArray()
 
-        if (settings.systemPrompt.isNotBlank()) {
+        // 系统提示 + 运行环境（当前时间 / 大概位置）合进同一条 system
+        val system = listOfNotNull(
+            settings.systemPrompt.trim().takeIf { it.isNotBlank() },
+            context?.trim()?.takeIf { it.isNotBlank() }?.let { "【运行环境】$it" },
+        ).joinToString("\n\n")
+
+        if (system.isNotBlank()) {
             messages.put(
                 JSONObject()
                     .put("role", "system")
-                    .put("content", settings.systemPrompt.trim()),
+                    .put("content", system),
             )
         }
 

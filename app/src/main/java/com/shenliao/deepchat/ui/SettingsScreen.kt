@@ -70,6 +70,19 @@ import com.shenliao.deepchat.data.Settings
 fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val s = vm.settings
     val clipboard = LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val hasLocation = remember {
+        context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+    var locationGranted by remember { mutableStateOf(hasLocation) }
+    val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        locationGranted = granted
+        vm.updateSettings(vm.settings.copy(withLocation = granted))
+        if (granted) com.shenliao.deepchat.util.RuntimeContext.refreshLocation(context) {}
+    }
 
     var baseUrl by remember { mutableStateOf(s.baseUrl) }
     var apiKey by remember { mutableStateOf(s.apiKey) }
@@ -238,7 +251,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .background(AppColors.PrimaryDim)
                                 .clickable {
                                     if (!testing) {
@@ -372,7 +385,40 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
             item {
                 SectionCard(
-                    title = "公式字体",
+                    title = "上下文",
+                    subtitle = "模型自己不知道现在几点、你在哪；打开这两项，每次请求会把它们一起带过去",
+                ) {
+                    ToggleRow(
+                        title = "附带当前时间",
+                        desc = if (s.withTime) "问「今天几号」「现在几点」时按真实时间回答" else "不告诉模型时间，它只能照训练数据猜",
+                        checked = s.withTime,
+                        onChange = { on -> vm.updateSettings(vm.settings.copy(withTime = on)) },
+                    )
+                    HorizontalDivider(color = AppColors.Border, modifier = Modifier.padding(vertical = 10.dp))
+                    ToggleRow(
+                        title = "附带大概位置",
+                        desc = when {
+                            s.withLocation -> "已开启，城市级精度（约 1 公里）"
+                            !locationGranted -> "需要定位权限，只取城市名，不存精确坐标"
+                            else -> "关掉了，模型不知道你在哪个城市"
+                        },
+                        checked = s.withLocation,
+                        onChange = { on ->
+                            if (!on) {
+                                vm.updateSettings(vm.settings.copy(withLocation = false))
+                            } else if (locationGranted) {
+                                vm.updateSettings(vm.settings.copy(withLocation = true))
+                                com.shenliao.deepchat.util.RuntimeContext.refreshLocation(context) {}
+                            } else {
+                                locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                            }
+                        },
+                    )
+                }
+            }
+
+            item {
+                SectionCard(title = "公式字体",
                     subtitle = "内置两款 OFL 开源数学字体，实际渲染用它们，不再是系统黑体",
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -476,7 +522,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 220.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .background(AppColors.CodeBg)
                                 .padding(10.dp)
                                 .verticalScroll(rememberScrollState()),
@@ -550,7 +596,7 @@ private fun SectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(AppColors.Surface)
             .padding(14.dp),
     ) {

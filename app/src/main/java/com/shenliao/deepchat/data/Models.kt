@@ -239,6 +239,10 @@ data class Settings(
     val mathFont: String = "stix",
     /** 外观：system 跟随系统 / light 白天 / dark 夜间 */
     val themeMode: String = "system",
+    /** 每次请求附带当前时间（模型自己没时钟） */
+    val withTime: Boolean = true,
+    /** 附带大概位置（需权限，城市级精度） */
+    val withLocation: Boolean = false,
 ) {
     val ready: Boolean get() = apiKey.isNotBlank() && baseUrl.isNotBlank() && model.isNotBlank()
 
