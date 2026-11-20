@@ -70,6 +70,75 @@ import com.shenliao.deepchat.data.Message
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** 单条消息渲染的字数预算：超过就先只排前一段，避免把主线程卡死（ANR） */
+private const val RENDER_BUDGET = 4000
+private const val PREVIEW_CHARS = 2200
+private const val CHUNK_CHARS = 2800
+
+/**
+ * 超长正文（几万字、8000 字无空格、3000 行列表）在主线程排版会长到几秒，
+ * Android 判定 ANR 直接杀进程——表现就是「闪退」。这里先只渲染前一段，
+ * 用户点「展开全文」再分段渲染剩下的内容。
+ */
+@Composable
+private fun SafeMarkdown(text: String) {
+    var expanded by remember(text) { mutableStateOf(false) }
+
+    if (text.length <= RENDER_BUDGET) {
+        MarkdownText(text)
+        return
+    }
+
+    if (!expanded) {
+        MarkdownText(text.take(PREVIEW_CHARS).trimEnd() + "\n\n…")
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(AppColors.SurfaceHigh)
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = "展开全文（共 ${text.length} 字）",
+                fontSize = 12.sp,
+                color = AppColors.Primary,
+            )
+        }
+        return
+    }
+
+    // 展开了也只分段渲染，单段不超过 CHUNK_CHARS，免得一次排版太重
+    val chunks = remember(text) { chunkByLine(text, CHUNK_CHARS) }
+    chunks.forEach { MarkdownText(it) }
+    Box(
+        modifier = Modifier
+            .padding(top = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(AppColors.SurfaceHigh)
+            .clickable { expanded = false }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text("收起", fontSize = 12.sp, color = AppColors.TextDim)
+    }
+}
+
+/** 尽量按行切，避免把代码块/表格从中间劈开 */
+private fun chunkByLine(text: String, maxChars: Int): List<String> {
+    if (text.length <= maxChars) return listOf(text)
+    val out = mutableListOf<String>()
+    val sb = StringBuilder()
+    text.lineSequence().forEach { line ->
+        sb.append(line).append('\n')
+        if (sb.length >= maxChars) {
+            out += sb.toString()
+            sb.setLength(0)
+        }
+    }
+    if (sb.isNotEmpty()) out += sb.toString()
+    return out
+}
+
 @Composable
 fun MessageRow(
     message: Message,
@@ -95,7 +164,7 @@ fun MessageRow(
         }
 
         if (reply.text.isNotBlank()) {
-            MarkdownText(reply.text)
+            SafeMarkdown(reply.text)
         } else if (streaming && reply.reasoning.isBlank()) {
             TypingDots()
         }
@@ -307,7 +376,13 @@ private fun EditMessageDialog(initial: String, onDismiss: () -> Unit, onConfirm:
 }
 
 @Composable
-fun ThinkingBlock(text: String, streaming: Boolean) {
+fun ThinkingBlock(textRaw: String, streaming: Boolean) {
+    // 推理过程也可能很长，超过 1.2 万字只显示前面一段，避免排版把主线程拖死
+    val text = if (textRaw.length > 12000) {
+        textRaw.take(12000) + "\n\n…（推理过程过长，只显示前一部分）"
+    } else {
+        textRaw
+    }
     var expanded by remember { mutableStateOf(streaming) }
     LaunchedEffect(streaming) { if (streaming) expanded = true }
 

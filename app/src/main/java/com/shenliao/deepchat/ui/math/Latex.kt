@@ -100,6 +100,7 @@ class LatexParser(private val src: String) {
 
     private var i = 0
     private var depth = 0
+    private var fracDepth = 0
 
     private fun guardDepth() {
         depth++
@@ -300,8 +301,15 @@ class LatexParser(private val src: String) {
     private fun parseCommand(): MNode {
         val name = readCommandName()
         return when {
-            name == "frac" || name == "dfrac" || name == "tfrac" ->
-                MNode.Frac(parseGroup(), parseGroup())
+            name == "frac" || name == "dfrac" || name == "tfrac" -> {
+                // 嵌套分式的排版代价随层数涨得很快（36 层就能吃掉几百毫秒），
+                // 超过 16 层人眼也读不清，直接当解析失败回退纯文本
+                fracDepth++
+                if (fracDepth > 16) throw IllegalStateException("分式嵌套太深")
+                val node = MNode.Frac(parseGroup(), parseGroup())
+                fracDepth--
+                node
+            }
 
             name == "sqrt" -> {
                 skipWs()
