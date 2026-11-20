@@ -2,6 +2,7 @@ package com.shenliao.deepchat.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,8 @@ sealed interface MdBlock {
     data class ListBlock(val ordered: Boolean, val items: List<String>) : MdBlock
     data class Quote(val text: String) : MdBlock
     data class Math(val latex: String) : MdBlock
+    /** 表格：`| a | b |` + `|---|---|` */
+    data class Table(val headers: List<String>, val rows: List<List<String>>) : MdBlock
     data object Rule : MdBlock
 }
 
@@ -129,8 +132,18 @@ private fun parseBlocks(rawSrc: String): List<MdBlock> {
                 out.add(MdBlock.Quote(MathInline.inlineToText(quote.toString().trim())))
             }
 
-            BULLET.containsMatchIn(t) || ORDERED.containsMatchIn(t) -> {
+            t.startsWith("|") && i + 1 < lines.size && isTableSeparator(lines[i + 1]) -> {
                 flushPara()
+                val headers = splitRow(t)
+                i += 2
+                val rows = mutableListOf<List<String>>()
+                while (i < lines.size && lines[i].trimStart().startsWith("|")) {
+                    rows.add(splitRow(lines[i]))
+                    i++
+                }
+                out.add(MdBlock.Table(headers, rows))
+            }
+            BULLET.containsMatchIn(t) || ORDERED.containsMatchIn(t) -> {                flushPara()
                 val ordered = ORDERED.containsMatchIn(t)
                 val items = mutableListOf<String>()
                 while (i < lines.size) {
@@ -309,6 +322,8 @@ fun MarkdownText(
 
                 is MdBlock.Code -> CodeBlock(block.lang, block.code)
 
+                is MdBlock.Table -> TableBlock(block, fontSize, color, base, codeStyle)
+
                 is MdBlock.Math -> {
                     if (canTypesetLatex(block.latex)) {
                         Box(
@@ -433,4 +448,126 @@ fun CodeBlock(lang: String, code: String) {
             )
         }
     }
+}
+
+/** 表格分隔行：|---|---| 或 |:--:|:--| */
+private fun isTableSeparator(line: String): Boolean {
+    val s = line.trim()
+    if (!s.startsWith("|") || !s.contains('-')) return false
+    return s.all { it == '|' || it == '-' || it == ':' || it == ' ' || it == '\t' }
+}
+
+/** 拆一行单元格，支持 \| 转义 */
+private fun splitRow(line: String): List<String> {
+    val cleaned = line.trim().removePrefix("|").removeSuffix("|")
+    val parts = mutableListOf<String>()
+    val sb = StringBuilder()
+    var i = 0
+    while (i < cleaned.length) {
+        val c = cleaned[i]
+        when {
+            c == '\\' && i + 1 < cleaned.length && cleaned[i + 1] == '|' -> {
+                sb.append('|')
+                i += 2
+            }
+            c == '|' -> {
+                parts.add(sb.toString().trim())
+                sb.setLength(0)
+                i++
+            }
+            else -> {
+                sb.append(c)
+                i++
+            }
+        }
+    }
+    parts.add(sb.toString().trim())
+    return parts
+}
+
+/** Markdown 表格：固定列宽 + 横向滚动，表头加粗带底色 */
+@Composable
+private fun TableBlock(
+    block: MdBlock.Table,
+    fontSize: TextUnit,
+    color: Color,
+    base: SpanStyle,
+    codeStyle: SpanStyle,
+) {
+    val cols = maxOf(block.headers.size, block.rows.maxOfOrNull { it.size } ?: 0).coerceAtLeast(1)
+    val charWidths = remember(block) {
+        (0 until cols).map { c ->
+            // 中文一个字差不多顶两个西文字符，按「显示宽度」算列宽，否则会被挤成竖排
+            val longest = maxOf(
+                displayUnits(block.headers.getOrNull(c) ?: ""),
+                block.rows.maxOfOrNull { displayUnits(it.getOrNull(c) ?: "") } ?: 0,
+            )
+            longest.coerceIn(4, 34)
+        }
+    }
+    val cellSize = (fontSize.value - 1f).coerceAtLeast(10f).sp
+    val cellSpan = base.copy(fontSize = cellSize)
+    val headerSpan = base.copy(fontSize = cellSize, fontWeight = FontWeight.SemiBold)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 2.dp)
+            .horizontalScroll(rememberScrollState()),
+    ) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(AppColors.Surface)
+                .border(1.dp, AppColors.Border, RoundedCornerShape(12.dp)),
+        ) {
+            // 表头
+            Row(Modifier.background(AppColors.SurfaceHigh)) {
+                charWidths.forEachIndexed { c, w ->
+                    Text(
+                        text = inlineAnnotated(
+                            block.headers.getOrNull(c) ?: "",
+                            headerSpan,
+                            AppColors.Primary,
+                            codeStyle,
+                        ),
+                        style = TextStyle(fontSize = cellSize, lineHeight = (cellSize.value + 6).sp, color = color, fontWeight = FontWeight.SemiBold),
+                        maxLines = 6,
+                        modifier = Modifier
+                            .width((w * 6.9f + 20).dp)
+                            .padding(horizontal = 9.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            block.rows.forEach { row ->
+                Box(Modifier.fillMaxWidth().height(1.dp).background(AppColors.Border))
+                Row {
+                    charWidths.forEachIndexed { c, w ->
+                        Text(
+                            text = inlineAnnotated(
+                                row.getOrNull(c) ?: "",
+                                cellSpan,
+                                AppColors.Primary,
+                                codeStyle,
+                            ),
+                            style = TextStyle(fontSize = cellSize, lineHeight = (cellSize.value + 6).sp, color = color),
+                            maxLines = 8,
+                            modifier = Modifier
+                                .width((w * 6.9f + 20).dp)
+                                .padding(horizontal = 9.dp, vertical = 7.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 估算一段文字占几个「西文字符宽」：CJK 记 2 */
+private fun displayUnits(s: String): Int {
+    var n = 0
+    for (ch in s) {
+        n += if (ch.code > 0x2E80) 2 else 1
+    }
+    return n
 }
